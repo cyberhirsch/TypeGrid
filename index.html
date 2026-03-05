@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeGrid - Modern Font Editor</title>
+    <meta name="description" content="A powerful grid-based font editor that exports TTF and OTF files.">
+    <link rel="stylesheet" href="./style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@300;400;600&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
+</head>
+
+<body class="dark-theme">
+    <div id="app">
+        <!-- Main Sidebar (Left) -->
+        <aside class="sidebar-left">
+            <div class="header">
+                <h1 class="logo">TYPE<span>GRID</span></h1>
+                <p class="tagline">Geometric Font Synth</p>
+            </div>
+
+            <div class="persistence control-group">
+                <div class="button-row-3">
+                    <button id="newProject">New</button>
+                    <button id="loadProject">Load</button>
+                    <button id="saveProject">Save</button>
+                </div>
+            </div>
+
+            <div class="tool-selection control-group">
+                <label>Active Tool</label>
+                <div class="button-row">
+                    <button id="toolFill" class="tool-btn active">Fill</button>
+                    <button id="toolLine" class="tool-btn">Line</button>
+                </div>
+            </div>
+
+            <div class="grid-controls">
+                <div class="control-group">
+                    <label>Grid Type</label>
+                    <select id="gridTypeSelect">
+                        <option value="geometric">Geometric (Rect)</option>
+                        <option value="curvature">Curvature</option>
+                        <option value="triangle">Triangle Split</option>
+                        <option value="hexagonal">Hexagonal</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <div class="label-row">
+                        <label for="rowsSlider">Rows</label>
+                        <span id="rowsValue" class="value-bubble">6</span>
+                    </div>
+                    <input type="range" id="rowsSlider" min="1" max="15" value="6">
+                </div>
+
+                <div class="control-group">
+                    <div class="label-row">
+                        <label for="colsSlider">Columns</label>
+                        <span id="colsValue" class="value-bubble">4</span>
+                    </div>
+                    <input type="range" id="colsSlider" min="1" max="15" value="4">
+                </div>
+
+                <div class="control-group">
+                    <div class="label-row">
+                        <label for="aspectSlider">Aspect Ratio</label>
+                        <span id="aspectValue" class="value-bubble">0.66</span>
+                    </div>
+                    <input type="range" id="aspectSlider" min="0.2" max="2.0" step="0.01" value="0.66">
+                    <div class="checkbox-row" style="margin-top: 5px;">
+                        <input type="checkbox" id="lockSquare">
+                        <label for="lockSquare" style="text-transform: none; cursor: pointer;">Square Cells</label>
+                    </div>
+                </div>
+
+                <div class="control-group" id="strokeControl" style="display:none;">
+                    <div class="label-row">
+                        <label for="strokeWeight">Stroke Weight</label>
+                        <span id="strokeWeightValue" class="value-bubble">4</span>
+                    </div>
+                    <input type="range" id="strokeWeight" min="1" max="20" value="4">
+                </div>
+            </div>
+
+            <div class="export-actions">
+                <label>Export</label>
+                <div class="button-row-3">
+                    <button id="exportFont">TTF</button>
+                    <button id="exportFontOTF">OTF</button>
+                    <button id="downloadSVG">SVG</button>
+                </div>
+            </div>
+
+            <div class="editor-actions secondary">
+                <button id="toggleGridLines">Grid Lines</button>
+                <button id="clearGlyph">Clear Current</button>
+            </div>
+
+
+        </aside>
+
+        <!-- Main Workspace (Center) -->
+        <main class="workspace">
+            <div class="canvas-container">
+                <svg id="editorCanvas" viewBox="0 0 400 600">
+                    <!-- Grid and shapes will be rendered here -->
+                </svg>
+            </div>
+        </main>
+
+        <!-- Right Overview Column -->
+        <aside class="sidebar-right inventory-column">
+            <div class="inventory-header">
+                <div class="active-info">
+                    <span id="currentCharDisplay">A</span>
+                </div>
+                <select id="charSetSelect" class="char-set-selector">
+                    <option value="minimal">Basic ASCII / Minimal</option>
+                    <option value="western">Western European / Latin-1</option>
+                    <option value="extended">Extended Latin</option>
+                    <option value="pro">Full Unicode / Pro</option>
+                </select>
+            </div>
+            <div class="glyph-grid" id="glyphGrid">
+                <!-- Glyphs A-Z will be here -->
+            </div>
+        </aside>
+    </div>
+
+    <!-- Scripts -->
+    <script src="./main.js"></script>
+</body>
+
+</html>
