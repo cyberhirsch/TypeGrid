@@ -56,14 +56,14 @@ export function saveToFile(config, glyphs) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     const name = (config.fontName || 'typegrid').toLowerCase().replace(/\s+/g, '-');
-    a.download = `${name}-project.json`;
+    a.download = `${name}.tgf`;
     a.click();
 }
 
 export function loadFromFile(onLoad) {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json';
+    input.accept = '.tgf,.json';
     input.onchange = e => {
         const file = e.target.files[0];
         if (!file) return;
