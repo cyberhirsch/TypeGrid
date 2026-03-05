@@ -20,7 +20,9 @@ class Typegrid {
             activeTool: 'fill',
             strokeWeight: 4,
             showTopo: false,
-            fontName: 'Typegrid'
+            fontName: 'Typegrid',
+            baseline: 5,
+            meanLine: 2
         };
         this.state = {
             activeChar: 'A',
@@ -66,6 +68,17 @@ class Typegrid {
         this.currentCharDisp = document.getElementById('currentCharDisplay');
         this.topoBtn = document.getElementById('vectorPreview');
         this.fontNameInput = document.getElementById('fontNameInput');
+        this.meanLineSlider = document.getElementById('meanLineSlider');
+        this.meanLineValue = document.getElementById('meanLineValue');
+        this.baselineSlider = document.getElementById('baselineSlider');
+        this.baselineValue = document.getElementById('baselineValue');
+        this.flipHBtn = document.getElementById('flipH');
+        this.flipVBtn = document.getElementById('flipV');
+        this.rotate180Btn = document.getElementById('rotate180');
+        this.nudgeLBtn = document.getElementById('nudgeL');
+        this.nudgeRBtn = document.getElementById('nudgeR');
+        this.nudgeUBtn = document.getElementById('nudgeU');
+        this.nudgeDBtn = document.getElementById('nudgeD');
     }
 
     /* ── EVENTS ──────────────────────────────────────────────────────────── */
@@ -99,6 +112,18 @@ class Typegrid {
         this.exportBtn.onclick = () => exportFont(this.state, this.config, 'ttf');
         document.getElementById('exportFontOTF').onclick = () => exportFont(this.state, this.config, 'otf');
         this.downloadSVGBtn.onclick = () => downloadSVG(this.canvas, this.state.activeChar, this.config.fontName);
+
+        this.meanLineSlider.oninput = e => { this.config.meanLine = +e.target.value; this.meanLineValue.textContent = this.config.meanLine; this.render(); };
+        this.baselineSlider.oninput = e => { this.config.baseline = +e.target.value; this.baselineValue.textContent = this.config.baseline; this.render(); };
+
+        this.flipHBtn.onclick = () => { this.flipGlyph('H'); this.refresh(); };
+        this.flipVBtn.onclick = () => { this.flipGlyph('V'); this.refresh(); };
+        this.rotate180Btn.onclick = () => { this.flipGlyph('H'); this.flipGlyph('V'); this.refresh(); };
+
+        this.nudgeLBtn.onclick = () => { this.nudgeGlyph(-1, 0); this.refresh(); };
+        this.nudgeRBtn.onclick = () => { this.nudgeGlyph(1, 0); this.refresh(); };
+        this.nudgeUBtn.onclick = () => { this.nudgeGlyph(0, -1); this.refresh(); };
+        this.nudgeDBtn.onclick = () => { this.nudgeGlyph(0, 1); this.refresh(); };
 
         this.topoBtn.onclick = () => {
             this.config.showTopo = !this.config.showTopo;
@@ -297,8 +322,110 @@ class Typegrid {
         this.charSetSelect.value = this.config.charSet;
         this.gridTypeSelect.value = this.config.gridType;
         this.fontNameInput.value = this.config.fontName || 'Typegrid';
+        this.meanLineSlider.value = this.config.meanLine || 2;
+        this.meanLineValue.textContent = this.config.meanLine || 2;
+        this.baselineSlider.value = this.config.baseline || 5;
+        this.baselineValue.textContent = this.config.baseline || 5;
         this.updateSquare();
         this.setTool(this.config.activeTool);
+    }
+
+    flipGlyph(axis) {
+        const g = this.glyph();
+        const H = 600, W = H * this.config.aspectRatio;
+        const { cols, rows } = this.config;
+        const newFills = new Set();
+        const newStrokes = new Set();
+
+        g.fills.forEach(id => {
+            if (id.startsWith('f-r-')) {
+                const parts = id.split('-');
+                const i = +parts[2], j = +parts[3];
+                if (axis === 'H') newFills.add(`f-r-${(cols - 1) - i}-${j}`);
+                else newFills.add(`f-r-${i}-${(rows - 1) - j}`);
+            } else if (id.startsWith('f-t-')) {
+                const parts = id.split('-');
+                const i = +parts[2], j = +parts[3], pos = parts[4];
+                let ni = i, nj = j, npos = pos;
+                if (axis === 'H') { ni = (cols - 1) - i; if (pos === 'r') npos = 'l'; else if (pos === 'l') npos = 'r'; }
+                else { nj = (rows - 1) - j; if (pos === 't') npos = 'b'; else if (pos === 'b') npos = 't'; }
+                newFills.add(`f-t-${ni}-${nj}-${npos}`);
+            } else if (id.startsWith('f-c-')) {
+                const parts = id.split('-');
+                const i = +parts[2], j = +parts[3], pos = parts[4];
+                let ni = i, nj = j, npos = pos;
+                if (axis === 'H') {
+                    ni = (cols - 1) - i;
+                    if (pos === 'bl') npos = 'br'; else if (pos === 'br') npos = 'bl';
+                    else if (pos === 'tl') npos = 'tr'; else if (pos === 'tr') npos = 'tl';
+                } else {
+                    nj = (rows - 1) - j;
+                    if (pos === 'bl') npos = 'tl'; else if (pos === 'tl') npos = 'bl';
+                    else if (pos === 'br') npos = 'tr'; else if (pos === 'tr') npos = 'br';
+                }
+                newFills.add(`f-c-${ni}-${nj}-${npos}`);
+            } else { newFills.add(id); }
+        });
+
+        g.strokes.forEach(id => {
+            if (id.startsWith('s:')) {
+                const [x1, y1, x2, y2] = id.substring(2).split(',').map(Number);
+                if (axis === 'H') newStrokes.add(`s:${(W - x1).toFixed(1)},${y1.toFixed(1)},${(W - x2).toFixed(1)},${y2.toFixed(1)}`);
+                else newStrokes.add(`s:${x1.toFixed(1)},${(H - y1).toFixed(1)},${x2.toFixed(1)},${(H - y2).toFixed(1)}`);
+            } else if (id.startsWith('a:')) {
+                const m = id.match(/M([\d.-]+)\s+([\d.-]+)\s+A([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)/);
+                if (m) {
+                    let [_, m1, m2, rx, ry, rot, laf, swf, x, y] = m.map(Number);
+                    if (axis === 'H') { m1 = W - m1; x = W - x; swf = 1 - swf; }
+                    else { m2 = H - m2; y = H - y; swf = 1 - swf; }
+                    newStrokes.add(`a:M${m1.toFixed(1)} ${m2.toFixed(1)} A${rx.toFixed(1)} ${ry.toFixed(1)} ${rot} ${laf} ${swf} ${x.toFixed(1)} ${y.toFixed(1)}`);
+                }
+            } else { newStrokes.add(id); }
+        });
+
+        g.fills = newFills;
+        g.strokes = newStrokes;
+    }
+
+    nudgeGlyph(dx, dy) {
+        const g = this.glyph();
+        const H = 600, W = H * this.config.aspectRatio;
+        const { cols, rows } = this.config;
+        const cw = W / cols, rh = H / rows;
+        const newFills = new Set();
+        const newStrokes = new Set();
+
+        g.fills.forEach(id => {
+            const parts = id.split('-');
+            const type = parts[1]; // r, t, c, h
+            const i = +parts[2], j = +parts[3];
+            const ni = i + dx, nj = j + dy;
+
+            // Reconstruct ID if within bounds
+            if (ni >= 0 && ni < (type === 'h' ? rows : cols) && nj >= 0 && nj < (type === 'h' ? cols : rows)) {
+                // Keep the same suffix/prefix structure
+                const suffix = parts.slice(4).join('-');
+                newFills.add(`f-${type}-${ni}-${nj}${suffix ? '-' + suffix : ''}`);
+            }
+        });
+
+        g.strokes.forEach(id => {
+            if (id.startsWith('s:')) {
+                const [x1, y1, x2, y2] = id.substring(2).split(',').map(Number);
+                newStrokes.add(`s:${(x1 + dx * cw).toFixed(1)},${(y1 + dy * rh).toFixed(1)},${(x2 + dx * cw).toFixed(1)},${(y2 + dy * rh).toFixed(1)}`);
+            } else if (id.startsWith('a:')) {
+                const m = id.match(/M([\d.-]+)\s+([\d.-]+)\s+A([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)/);
+                if (m) {
+                    let [_, m1, m2, rx, ry, rot, laf, swf, x, y] = m.map(Number);
+                    m1 += dx * cw; m2 += dy * rh;
+                    x += dx * cw; y += dy * rh;
+                    newStrokes.add(`a:M${m1.toFixed(1)} ${m2.toFixed(1)} A${rx.toFixed(1)} ${ry.toFixed(1)} ${rot} ${laf} ${swf} ${x.toFixed(1)} ${y.toFixed(1)}`);
+                }
+            } else { newStrokes.add(id); }
+        });
+
+        g.fills = newFills;
+        g.strokes = newStrokes;
     }
 
     /* ── RENDER ──────────────────────────────────────────────────────────── */
@@ -327,6 +454,8 @@ class Typegrid {
         for (const ch of charSet) {
             const item = document.createElement('div');
             item.className = 'glyph-item' + (ch === this.state.activeChar ? ' active' : '');
+            item.setAttribute('draggable', 'true');
+            item.setAttribute('data-char', ch);
 
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             // Use local logical 600px space so strokes scale correctly
@@ -343,7 +472,28 @@ class Typegrid {
 
             item.appendChild(svg);
             item.appendChild(lbl);
+
             item.onclick = () => { this.state.activeChar = ch; this.refresh(); };
+
+            // Drag and Drop Letter Copy
+            item.ondragstart = e => {
+                e.dataTransfer.setData('text/plain', ch);
+                item.classList.add('dragging');
+            };
+            item.ondragend = () => item.classList.remove('dragging');
+            item.ondragover = e => e.preventDefault();
+            item.ondrop = e => {
+                e.preventDefault();
+                const sourceChar = e.dataTransfer.getData('text/plain');
+                if (sourceChar && sourceChar !== ch) {
+                    const src = this.glyph(sourceChar);
+                    const dest = this.glyph(ch);
+                    dest.fills = new Set(src.fills);
+                    dest.strokes = new Set(src.strokes);
+                    this.refresh();
+                }
+            };
+
             this.glyphGrid.appendChild(item);
         }
         this.currentCharDisp.textContent = this.state.activeChar;

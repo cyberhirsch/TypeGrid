@@ -45,6 +45,21 @@
                 </div>
             </div>
 
+            <div class="control-group">
+                <label>Transform</label>
+                <div class="button-row">
+                    <button id="flipH">Flip H</button>
+                    <button id="flipV">Flip V</button>
+                    <button id="rotate180">Rotate 180</button>
+                </div>
+                <div class="button-row" style="margin-top: 5px;">
+                    <button id="nudgeL" title="Nudge Left">←</button>
+                    <button id="nudgeR" title="Nudge Right">→</button>
+                    <button id="nudgeU" title="Nudge Up">↑</button>
+                    <button id="nudgeD" title="Nudge Down">↓</button>
+                </div>
+            </div>
+
             <div class="grid-controls">
                 <div class="control-group">
                     <label>Grid Type</label>
@@ -89,7 +104,23 @@
                         <label for="strokeWeight">Stroke Weight</label>
                         <span id="strokeWeightValue" class="value-bubble">4</span>
                     </div>
-                    <input type="range" id="strokeWeight" min="1" max="20" value="4">
+                    <input type="range" id="strokeWeight" min="1" max="100" value="4">
+                </div>
+
+                <div class="control-group">
+                    <div class="label-row">
+                        <label for="meanLineSlider">Mean Line (x-height)</label>
+                        <span id="meanLineValue" class="value-bubble">2</span>
+                    </div>
+                    <input type="range" id="meanLineSlider" min="0" max="15" value="2">
+                </div>
+
+                <div class="control-group">
+                    <div class="label-row">
+                        <label for="baselineSlider">Baseline</label>
+                        <span id="baselineValue" class="value-bubble">5</span>
+                    </div>
+                    <input type="range" id="baselineSlider" min="0" max="15" value="5">
                 </div>
             </div>
 
@@ -104,9 +135,11 @@
 
             <div class="editor-actions secondary">
                 <button id="toggleGridLines">Grid Lines</button>
-                <button id="clearGlyph">Clear Current</button>
-                <button id="vectorPreview">Vector Preview</button>
+                <button id="clearGlyph">Clear</button>
+                <button id="vectorPreview">Topology</button>
             </div>
+
+
 
             <div class="copyright">
                 &copy; 2026 CYBERHIRSCH

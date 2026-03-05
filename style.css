@@ -190,7 +190,7 @@ button {
 }
 button:hover { border-color: #666; background: #111; }
 
-.button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.button-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 0.5rem; }
 .button-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; }
 .tool-btn.active { background: #fff; color: #000; border-color: #fff; }
 
@@ -241,6 +241,10 @@ button:hover { border-color: #666; background: #111; }
 .glyph-item.active {
     border-color: #fff;
     background: #111;
+}
+.glyph-item.dragging {
+    opacity: 0.5;
+    border: 1px dashed #fff;
 }
 
 .preview-svg {

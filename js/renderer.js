@@ -30,6 +30,14 @@ function drawGuides(app, svg, cw, rh, W, H, color) {
     for (let i = 0; i <= config.cols; i++) mkLine(svg, i * cw, 0, i * cw, H, color, 0.5);
     for (let j = 0; j <= config.rows; j++) mkLine(svg, 0, j * rh, W, j * rh, color, 0.5);
 
+    // Baseline and Mean line (x-height)
+    if (config.baseline !== undefined) {
+        mkLine(svg, 0, config.baseline * rh, W, config.baseline * rh, '#ff4444', 1.0);
+    }
+    if (config.meanLine !== undefined) {
+        mkLine(svg, 0, config.meanLine * rh, W, config.meanLine * rh, '#4488ff', 1.0);
+    }
+
     if (config.gridType === 'triangle') {
         for (let i = 0; i < config.cols; i++) for (let j = 0; j < config.rows; j++) {
             mkLine(svg, i * cw, j * rh, (i + 1) * cw, (j + 1) * rh, color, 0.3);
