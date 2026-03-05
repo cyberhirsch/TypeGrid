@@ -32,6 +32,11 @@
                 </div>
             </div>
 
+            <div class="control-group">
+                <label for="fontNameInput">Font Name</label>
+                <input type="text" id="fontNameInput" value="Typegrid" placeholder="Enter font name...">
+            </div>
+
             <div class="tool-selection control-group">
                 <label>Active Tool</label>
                 <div class="button-row">
@@ -100,9 +105,12 @@
             <div class="editor-actions secondary">
                 <button id="toggleGridLines">Grid Lines</button>
                 <button id="clearGlyph">Clear Current</button>
+                <button id="vectorPreview">Vector Preview</button>
             </div>
 
-
+            <div class="copyright">
+                &copy; 2026 CYBERHIRSCH
+            </div>
         </aside>
 
         <!-- Main Workspace (Center) -->
@@ -134,7 +142,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="./main.js"></script>
+    <script type="module" src="./main.js"></script>
 </body>
 
 </html>

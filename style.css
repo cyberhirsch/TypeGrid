@@ -24,6 +24,22 @@ body {
     overflow: hidden;
 }
 
+input[type="text"] {
+    width: 100%;
+    background: #111;
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 0.5rem;
+    font-family: var(--font-ui);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+input[type="text"]:focus {
+    border-color: #555;
+}
+
 /* Left sidebar: fixed 260px */
 .sidebar-left {
     flex: 0 0 260px;
@@ -36,6 +52,13 @@ body {
     flex-direction: column;
     gap: 1.5rem;
     z-index: 10;
+}
+
+.copyright {
+    margin-top: auto;
+    font-size: 0.75rem;
+    color: #444;
+    text-align: left;
 }
 
 /* Canvas: shrink-to-fit, centered vertically */
@@ -234,7 +257,6 @@ button:hover { border-color: #666; background: #111; }
     color: var(--dim-text);
     padding: 0.25rem 0;
     letter-spacing: 0.05rem;
-    text-transform: uppercase;
 }
 .glyph-item.active .char-label { color: #fff; }
 
