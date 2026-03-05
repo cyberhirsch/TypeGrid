@@ -22,7 +22,9 @@ class Typegrid {
             showTopo: false,
             fontName: 'Typegrid',
             baseline: 5,
-            meanLine: 2
+            meanLine: 2,
+            tracking: 0,
+            previewText: 'TYPEGRID'
         };
         this.state = {
             activeChar: 'A',
@@ -79,6 +81,11 @@ class Typegrid {
         this.nudgeRBtn = document.getElementById('nudgeR');
         this.nudgeUBtn = document.getElementById('nudgeU');
         this.nudgeDBtn = document.getElementById('nudgeD');
+
+        this.previewInput = document.getElementById('previewInput');
+        this.trackingSlider = document.getElementById('trackingSlider');
+        this.trackingValue = document.getElementById('trackingValue');
+        this.wordPreviewDisplay = document.getElementById('wordPreviewDisplay');
     }
 
     /* ── EVENTS ──────────────────────────────────────────────────────────── */
@@ -124,6 +131,13 @@ class Typegrid {
         this.nudgeRBtn.onclick = () => { this.nudgeGlyph(1, 0); this.refresh(); };
         this.nudgeUBtn.onclick = () => { this.nudgeGlyph(0, -1); this.refresh(); };
         this.nudgeDBtn.onclick = () => { this.nudgeGlyph(0, 1); this.refresh(); };
+
+        this.previewInput.oninput = e => { this.config.previewText = e.target.value; this.renderWordPreview(); };
+        this.trackingSlider.oninput = e => {
+            this.config.tracking = +e.target.value;
+            this.trackingValue.textContent = this.config.tracking;
+            this.renderWordPreview();
+        };
 
         this.topoBtn.onclick = () => {
             this.config.showTopo = !this.config.showTopo;
@@ -202,7 +216,12 @@ class Typegrid {
     }
 
     /* ── STATE HELPERS ───────────────────────────────────────────────────── */
-    refresh() { this.render(); this.setupGlyphs(); saveToStorage(this.config, this.state.glyphs); }
+    refresh() {
+        this.render();
+        this.setupGlyphs();
+        this.renderWordPreview();
+        saveToStorage(this.config, this.state.glyphs);
+    }
 
     glyph(c) {
         c = c || this.state.activeChar;
@@ -326,6 +345,9 @@ class Typegrid {
         this.meanLineValue.textContent = this.config.meanLine || 2;
         this.baselineSlider.value = this.config.baseline || 5;
         this.baselineValue.textContent = this.config.baseline || 5;
+        this.trackingSlider.value = this.config.tracking || 0;
+        this.trackingValue.textContent = this.config.tracking || 0;
+        this.previewInput.value = this.config.previewText || 'TYPEGRID';
         this.updateSquare();
         this.setTool(this.config.activeTool);
     }
@@ -497,6 +519,30 @@ class Typegrid {
             this.glyphGrid.appendChild(item);
         }
         this.currentCharDisp.textContent = this.state.activeChar;
+    }
+
+    /* ── WORD PREVIEW ────────────────────────────────────────────────────── */
+    renderWordPreview() {
+        if (!this.wordPreviewDisplay) return;
+        this.wordPreviewDisplay.innerHTML = '';
+        const text = this.config.previewText || '';
+        const H = 600, W = H * this.config.aspectRatio;
+        const pad = this.config.strokeWeight + 2;
+        const tracking = this.config.tracking || 0;
+
+        for (const char of text) {
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('viewBox', `${-pad} ${-pad} ${W + 2 * pad} ${H + 2 * pad}`);
+            svg.classList.add('word-preview-svg');
+
+            // Calc actual width based on aspect ratio
+            const displayWidth = 60 * this.config.aspectRatio;
+            svg.style.width = `${displayWidth}px`;
+            svg.style.marginRight = `${tracking / 10}px`;
+
+            drawInto(this, svg, char, W, H, false);
+            this.wordPreviewDisplay.appendChild(svg);
+        }
     }
 }
 

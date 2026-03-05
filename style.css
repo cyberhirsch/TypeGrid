@@ -113,6 +113,36 @@ input[type="text"]:focus {
     padding: 1rem;
 }
 
+.word-preview-section {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: #080808;
+}
+
+.preview-controls-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+}
+
+.word-preview-display {
+    width: 100%;
+    min-height: 80px;
+    background: #000;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    overflow-x: auto;
+    border: 1px solid #222;
+    white-space: nowrap;
+}
+
+.word-preview-svg {
+    height: 60px;
+    flex-shrink: 0;
+}
+
 /* ============ LEFT SIDEBAR ============ */
 .logo {
     font-family: var(--font-ui);
