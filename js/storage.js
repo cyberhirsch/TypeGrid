@@ -55,7 +55,7 @@ export function saveToFile(config, glyphs) {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    const name = (config.fontName || 'typegrid').toLowerCase().replace(/\s+/g, '-');
+    const name = (config.fontName || 'Typegrid').replace(/\s+/g, '-');
     a.download = `${name}.tgf`;
     a.click();
 }

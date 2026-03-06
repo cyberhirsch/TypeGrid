@@ -9,7 +9,7 @@ export function downloadSVG(canvas, activeChar, fontName = 'typegrid') {
     const svgData = new XMLSerializer().serializeToString(canvas);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([svgData], { type: 'image/svg+xml' }));
-    const name = fontName.toLowerCase().replace(/\s+/g, '-');
+    const name = fontName.replace(/\s+/g, '-');
     a.download = `${name}-${activeChar}.svg`;
     a.click();
 }
@@ -55,7 +55,8 @@ export function exportFont(state, config, format = 'ttf') {
         glyphs
     });
 
-    font.download(`typegrid.${format}`);
+    const filename = (config.fontName || 'Typegrid').replace(/\s+/g, '-');
+    font.download(`${filename}.${format}`);
 }
 
 /**
