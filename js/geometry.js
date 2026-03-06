@@ -104,36 +104,47 @@ export function collectShapes(glyph, config, opts = {}) {
             const I = Number(i), J = Number(j), s = cw;
             const x = I * cw, y = J * rh;
             const pts = [];
-            // Simple approximation of the arcs for export
-            if (pos === 'bl') {
-                pts.push([x, y + rh]);
-                for (let a = 180; a >= 90; a -= 10) pts.push([x + s + s * Math.cos(a * Math.PI / 180), y + rh + s * Math.sin(a * Math.PI / 180)]);
-                pts.push([x + s, y + rh]);
-            } else if (pos === 'br') {
-                pts.push([x + s, y + rh]);
-                for (let a = 0; a >= -90; a -= 10) pts.push([x + s * Math.cos(a * Math.PI / 180), y + rh + s * Math.sin(a * Math.PI / 180)]);
-                pts.push([x, y + rh]);
-            } else if (pos === 'tl') {
+            const step = 5;
+            const rad = a => a * Math.PI / 180;
+
+            if (pos === 'tl') {
+                // SVG: M(x,y) L(x+s,y) Arc to (x,y+s) — center at (x,y)
                 pts.push([x, y]);
-                for (let a = 180; a <= 270; a += 10) pts.push([x + s + s * Math.cos(a * Math.PI / 180), y + s * Math.sin(a * Math.PI / 180)]);
-                pts.push([x + s, y]);
+                for (let a = 0; a <= 90; a += step)
+                    pts.push([x + s * Math.cos(rad(a)), y + s * Math.sin(rad(a))]);
             } else if (pos === 'tr') {
+                // SVG: M(x+s,y) L(x,y) Arc to (x+s,y+s) — center at (x+s,y)
                 pts.push([x + s, y]);
-                for (let a = 0; a <= 90; a += 10) pts.push([x + s * Math.cos(a * Math.PI / 180), y + s * Math.sin(a * Math.PI / 180)]);
-                pts.push([x, y]);
+                for (let a = 180; a >= 90; a -= step)
+                    pts.push([x + s + s * Math.cos(rad(a)), y + s * Math.sin(rad(a))]);
+            } else if (pos === 'bl') {
+                // SVG: M(x,y+s) L(x,y) Arc to (x+s,y+s) — center at (x,y+s)
+                pts.push([x, y + s]);
+                for (let a = 270; a <= 360; a += step)
+                    pts.push([x + s * Math.cos(rad(a)), y + s + s * Math.sin(rad(a))]);
+            } else if (pos === 'br') {
+                // SVG: M(x+s,y+s) L(x+s,y) Arc to (x,y+s) — center at (x+s,y+s)
+                pts.push([x + s, y + s]);
+                for (let a = 270; a >= 180; a -= step)
+                    pts.push([x + s + s * Math.cos(rad(a)), y + s + s * Math.sin(rad(a))]);
             }
             if (pts.length) shapes.push(pts.map(([px, py]) => tx(px, py)));
         } else if (id.startsWith('f-h-')) {
-            const [i, j] = id.substring(4).split('-').map(Number);
-            const hW = cw, hH = rh, vd = hH * 0.75;
-            const ox = (j % 2 === 0) ? 0 : hW / 2;
-            const hx = i * hW + hW / 2 + ox, hy = j * vd + hH / 2;
-            const pts = [];
-            for (let a = 0; a < 6; a++) {
-                const an = (Math.PI / 180) * (60 * a - 30);
-                pts.push(tx(hx + (hW / 2) * Math.cos(an), hy + (hH / 2) * Math.sin(an)));
+            const parts = id.substring(4).split('-');
+            const i = Number(parts[0]), j = Number(parts[1]), type = parts[2];
+            const dx = (j % 2) * 0.5 * cw;
+            const dn = ((j + 1) % 2) * 0.5 * cw;
+            let pts;
+            if (type === 'd') {
+                // Down triangle: P(i,j), P(i+1,j), and the point between them below
+                const targetIdx = i + (j % 2);
+                pts = [[i * cw + dx, j * rh], [(i + 1) * cw + dx, j * rh], [targetIdx * cw + dn, (j + 1) * rh]];
+            } else {
+                // Up triangle: Q(i,j+1), Q(i+1,j+1), and the point between them above
+                const targetIdx = i + (j % 2 ? 0 : 1);
+                pts = [[i * cw + dn, (j + 1) * rh], [(i + 1) * cw + dn, (j + 1) * rh], [targetIdx * cw + dx, j * rh]];
             }
-            shapes.push(pts);
+            shapes.push(pts.map(([px, py]) => tx(px, py)));
         }
     });
 

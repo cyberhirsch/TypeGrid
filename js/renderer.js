@@ -7,14 +7,30 @@ export function drawInto(app, svg, ch, W, H, interactive) {
     const { config } = app;
     const cw = W / config.cols, rh = H / config.rows;
 
-    drawFills(app, svg, ch, cw, rh, interactive);
-    drawStrokes(app, svg, ch, cw, rh);
+    // For hexagonal grid, clip content to the canvas bounds
+    let drawTarget = svg;
+    if (config.gridType === 'hexagonal') {
+        const defs = mk(svg, 'defs');
+        const cp = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
+        cp.setAttribute('id', 'canvasClip');
+        const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        r.setAttribute('x', 0); r.setAttribute('y', 0);
+        r.setAttribute('width', W); r.setAttribute('height', H);
+        cp.appendChild(r);
+        defs.appendChild(cp);
+        const g = mk(svg, 'g');
+        g.setAttribute('clip-path', 'url(#canvasClip)');
+        drawTarget = g;
+    }
+
+    drawFills(app, drawTarget, ch, cw, rh, interactive);
+    drawStrokes(app, drawTarget, ch, cw, rh);
 
     if (config.showGridLines || !interactive)
-        drawGuides(app, svg, cw, rh, W, H, interactive ? '#333' : '#1a1a1a');
+        drawGuides(app, drawTarget, cw, rh, W, H, interactive ? '#333' : '#1a1a1a');
 
     if (interactive) {
-        if (config.activeTool === 'line') drawLineHitZones(app, svg, cw, rh, W, H);
+        if (config.activeTool === 'line') drawLineHitZones(app, drawTarget, cw, rh, W, H);
     }
 }
 
@@ -27,7 +43,9 @@ export function drawGuidesOnly(app, svg, W, H) {
 
 function drawGuides(app, svg, cw, rh, W, H, color) {
     const { config } = app;
-    for (let i = 0; i <= config.cols; i++) mkLine(svg, i * cw, 0, i * cw, H, color, 0.5);
+    if (config.gridType !== 'hexagonal') {
+        for (let i = 0; i <= config.cols; i++) mkLine(svg, i * cw, 0, i * cw, H, color, 0.5);
+    }
     for (let j = 0; j <= config.rows; j++) mkLine(svg, 0, j * rh, W, j * rh, color, 0.5);
 
     // Baseline and Mean line (x-height)
@@ -40,22 +58,25 @@ function drawGuides(app, svg, cw, rh, W, H, color) {
 
     if (config.gridType === 'triangle') {
         for (let i = 0; i < config.cols; i++) for (let j = 0; j < config.rows; j++) {
-            mkLine(svg, i * cw, j * rh, (i + 1) * cw, (j + 1) * rh, color, 0.3);
-            mkLine(svg, (i + 1) * cw, j * rh, i * cw, (j + 1) * rh, color, 0.3);
+            mkLine(svg, i * cw, j * rh, (i + 1) * cw, (j + 1) * rh, color, 0.5);
+            mkLine(svg, (i + 1) * cw, j * rh, i * cw, (j + 1) * rh, color, 0.5);
         }
     } else if (config.gridType === 'hexagonal') {
-        const hW = cw, hH = rh, vd = hH * 0.75;
-        for (let i = 0; i < config.cols; i++) for (let j = 0; j < config.rows; j++) {
-            const ox = (j % 2 === 0) ? 0 : hW / 2;
-            const hx = i * hW + hW / 2 + ox, hy = j * vd + hH / 2;
-            const pts = [];
-            for (let a = 0; a < 6; a++) {
-                const an = (Math.PI / 180) * (60 * a - 30);
-                pts.push([hx + (hW / 2) * Math.cos(an), hy + (hH / 2) * Math.sin(an)]);
-            }
-            for (let a = 0; a < 6; a++) {
-                const b = (a + 1) % 6;
-                mkLine(svg, pts[a][0], pts[a][1], pts[b][0], pts[b][1], color, 0.5);
+        for (let j = 0; j <= config.rows; j++) {
+            const dx = (j % 2) * 0.5 * cw;
+            const dn = ((j + 1) % 2) * 0.5 * cw;
+            for (let i = -1; i <= config.cols + 1; i++) {
+                const x = i * cw + dx;
+                const y = j * rh;
+
+                // Diagonals (Symmetrical)
+                if (j < config.rows) {
+                    // Each point connects to normalized relative -0.5 and +0.5 positions below
+                    const targetL = (i - (j % 2 ? 0 : 1)) * cw + dn;
+                    const targetR = (i + (j % 2 ? 1 : 0)) * cw + dn;
+                    mkLine(svg, x, y, targetL, (j + 1) * rh, color, 0.4);
+                    mkLine(svg, x, y, targetR, (j + 1) * rh, color, 0.4);
+                }
             }
         }
     } else if (config.gridType === 'curvature') {
@@ -63,7 +84,7 @@ function drawGuides(app, svg, cw, rh, W, H, color) {
             const c = mk(svg, 'circle');
             c.setAttribute('cx', i * cw); c.setAttribute('cy', j * rh); c.setAttribute('r', cw);
             c.setAttribute('fill', 'none'); c.setAttribute('stroke', color);
-            c.setAttribute('stroke-width', '0.5'); c.setAttribute('stroke-dasharray', '2,2');
+            c.setAttribute('stroke-width', '0.5');
         }
     }
 }
@@ -73,10 +94,11 @@ function drawFills(app, svg, ch, cw, rh, interactive) {
     const fills = app.glyph(ch).fills;
     const canClick = interactive && config.activeTool === 'fill';
 
-    for (let i = 0; i < config.cols; i++) for (let j = 0; j < config.rows; j++) {
+    const hexExtra = config.gridType === 'hexagonal' ? 1 : 0;
+    for (let i = -hexExtra; i < config.cols + hexExtra; i++) for (let j = 0; j < config.rows; j++) {
         const gt = config.gridType;
 
-        if (gt === 'geometric') {
+        if (gt === 'geometric' && i >= 0 && i < config.cols) {
             const id = `f-r-${i}-${j}`;
             const r = mk(svg, 'rect');
             r.setAttribute('x', i * cw); r.setAttribute('y', j * rh);
@@ -85,7 +107,7 @@ function drawFills(app, svg, ch, cw, rh, interactive) {
             if (canClick) { r.setAttribute('data-id', id); }
             else { r.style.pointerEvents = 'none'; }
 
-        } else if (gt === 'triangle') {
+        } else if (gt === 'triangle' && i >= 0 && i < config.cols) {
             const cx = i * cw + cw / 2, cy = j * rh + rh / 2;
             const tl = [i * cw, j * rh], tr = [(i + 1) * cw, j * rh];
             const bl = [i * cw, (j + 1) * rh], br = [(i + 1) * cw, (j + 1) * rh], ct = [cx, cy];
@@ -94,22 +116,49 @@ function drawFills(app, svg, ch, cw, rh, interactive) {
             mkPoly(svg, [br, bl, ct], `f-t-${i}-${j}-b`, fills, canClick);
             mkPoly(svg, [bl, tl, ct], `f-t-${i}-${j}-l`, fills, canClick);
 
-        } else if (gt === 'curvature') {
+        } else if (gt === 'curvature' && i >= 0 && i < config.cols) {
             const x = i * cw, y = j * rh, s = cw;
-            mkPath(svg, `M${x} ${y}A${s} ${s} 0 0 0 ${x + s} ${y + rh}L${x} ${y + rh}Z`, `f-c-${i}-${j}-bl`, fills, canClick);
-            mkPath(svg, `M${x + s} ${y}A${s} ${s} 0 0 1 ${x} ${y + rh}L${x + s} ${y + rh}Z`, `f-c-${i}-${j}-br`, fills, canClick);
-            mkPath(svg, `M${x} ${y + rh}A${s} ${s} 0 0 0 ${x + s} ${y}L${x} ${y}Z`, `f-c-${i}-${j}-tl`, fills, canClick);
-            mkPath(svg, `M${x + s} ${y + rh}A${s} ${s} 0 0 1 ${x} ${y}L${x + s} ${y}Z`, `f-c-${i}-${j}-tr`, fills, canClick);
+            const h = s / 2;
+
+            // Interaction Zones (4 Quadrants) - Drawing these first so they are behind/selectable
+            const quadrants = [
+                { id: `f-c-${i}-${j}-tl`, x: x, y: y },
+                { id: `f-c-${i}-${j}-tr`, x: x + h, y: y },
+                { id: `f-c-${i}-${j}-bl`, x: x, y: y + h },
+                { id: `f-c-${i}-${j}-br`, x: x + h, y: y + h }
+            ];
+
+            quadrants.forEach(q => {
+                const r = mk(svg, 'rect');
+                r.setAttribute('x', q.x); r.setAttribute('y', q.y);
+                r.setAttribute('width', h); r.setAttribute('height', h);
+                r.setAttribute('fill', 'transparent'); // Invisible interaction zone
+                if (canClick) r.setAttribute('data-id', q.id);
+            });
+
+            // Visual Fills (4 Overlapping Quarter Circles)
+            // tl: center(x,y), arc from (x+s,y) to (x,y+s)
+            if (fills.has(`f-c-${i}-${j}-tl`)) { const p = mk(svg, 'path'); p.setAttribute('d', `M${x} ${y} L${x + s} ${y} A${s} ${s} 0 0 1 ${x} ${y + s} Z`); p.setAttribute('fill', '#fff'); p.style.pointerEvents = 'none'; }
+            // tr: center(x+s,y), arc from (x,y) to (x+s,y+s)
+            if (fills.has(`f-c-${i}-${j}-tr`)) { const p = mk(svg, 'path'); p.setAttribute('d', `M${x + s} ${y} L${x} ${y} A${s} ${s} 0 0 0 ${x + s} ${y + s} Z`); p.setAttribute('fill', '#fff'); p.style.pointerEvents = 'none'; }
+            // bl: center(x,y+s), arc from (x,y) to (x+s,y+s)
+            if (fills.has(`f-c-${i}-${j}-bl`)) { const p = mk(svg, 'path'); p.setAttribute('d', `M${x} ${y + s} L${x} ${y} A${s} ${s} 0 0 1 ${x + s} ${y + s} Z`); p.setAttribute('fill', '#fff'); p.style.pointerEvents = 'none'; }
+            // br: center(x+s,y+s), arc from (x+s,y) to (x,y+s)
+            if (fills.has(`f-c-${i}-${j}-br`)) { const p = mk(svg, 'path'); p.setAttribute('d', `M${x + s} ${y + s} L${x + s} ${y} A${s} ${s} 0 0 0 ${x} ${y + s} Z`); p.setAttribute('fill', '#fff'); p.style.pointerEvents = 'none'; }
 
         } else if (gt === 'hexagonal') {
-            const hW = cw, hH = rh, vd = hH * 0.75, ox = (j % 2 === 0) ? 0 : hW / 2;
-            const hx = i * hW + hW / 2 + ox, hy = j * vd + hH / 2;
-            const pts = [];
-            for (let a = 0; a < 6; a++) {
-                const an = (Math.PI / 180) * (60 * a - 30);
-                pts.push([hx + (hW / 2) * Math.cos(an), hy + (hH / 2) * Math.sin(an)]);
-            }
-            mkPoly(svg, pts, `f-h-${i}-${j}`, fills, canClick);
+            // Use the same vertex math as drawGuides
+            const dx = (j % 2) * 0.5 * cw;
+            const dn = ((j + 1) % 2) * 0.5 * cw;
+            const x = i * cw + dx, y = j * rh;
+            // The two points this vertex connects to below
+            const targetL = (i - (j % 2 ? 0 : 1)) * cw + dn;
+            const targetR = (i + (j % 2 ? 1 : 0)) * cw + dn;
+            const yBelow = (j + 1) * rh;
+            // Down triangle: current point, next point on same row, left-target below
+            mkPoly(svg, [[x, y], [(i + 1) * cw + dx, y], [targetR, yBelow]], `f-h-${i}-${j}-d`, fills, canClick);
+            // Up triangle: two adjacent targets below, next point on same row
+            mkPoly(svg, [[targetR, yBelow], [(i + 1 - (j % 2 ? 0 : 1)) * cw + dn + cw, yBelow], [(i + 1) * cw + dx, y]], `f-h-${i}-${j}-u`, fills, canClick);
         }
     }
 }
@@ -167,19 +216,20 @@ function drawLineHitZones(app, svg, cw, rh, W, H) {
             mkArcHit(svg, `M${x + s} ${y + rh} A${s} ${s} 0 0 1 ${x} ${y}`);
         }
     } else if (config.gridType === 'hexagonal') {
-        const hW = cw, hH = rh, vd = hH * 0.75;
-        for (let i = 0; i < config.cols; i++) for (let j = 0; j < config.rows; j++) {
-            const ox = (j % 2 === 0) ? 0 : hW / 2;
-            const hx = i * hW + hW / 2 + ox, hy = j * vd + hH / 2;
-            const pts = [];
-            for (let a = 0; a < 6; a++) {
-                const an = (Math.PI / 180) * (60 * a - 30);
-                pts.push([hx + (hW / 2) * Math.cos(an), hy + (hH / 2) * Math.sin(an)]);
-            }
-            for (let a = 0; a < 6; a++) {
-                const b = (a + 1) % 6;
-                mkHit(svg, pts[a][0], pts[a][1], pts[b][0], pts[b][1]);
+        for (let j = 0; j < config.rows; j++) {
+            const dx = (j % 2) * 0.5 * cw;
+            const dn = ((j + 1) % 2) * 0.5 * cw;
+            for (let i = -1; i <= config.cols + 1; i++) {
+                const x = i * cw + dx, y = j * rh;
+                const targetL = (i - (j % 2 ? 0 : 1)) * cw + dn;
+                const targetR = (i + (j % 2 ? 1 : 0)) * cw + dn;
+                mkHit(svg, x, y, targetL, (j + 1) * rh);
+                mkHit(svg, x, y, targetR, (j + 1) * rh);
+                if (i < config.cols) mkHit(svg, x, y, (i + 1) * cw + dx, y);
             }
         }
+        // Last row horizontal hits
+        const lastY = config.rows * rh, lastDx = (config.rows % 2) * 0.5 * cw;
+        for (let i = 0; i < config.cols; i++) mkHit(svg, i * cw + lastDx, lastY, (i + 1) * cw + lastDx, lastY);
     }
 }
