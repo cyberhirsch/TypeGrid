@@ -49,6 +49,7 @@
                 <div class="button-row">
                     <button id="toolFill" class="tool-btn active">Fill</button>
                     <button id="toolLine" class="tool-btn">Line</button>
+                    <button id="clearGlyph">Clear</button>
                 </div>
             </div>
 
@@ -141,8 +142,7 @@
             </div>
 
             <div class="editor-actions secondary">
-                <button id="toggleGridLines">Grid Lines</button>
-                <button id="clearGlyph">Clear</button>
+                <button id="editMetadata">Info</button>
                 <button id="vectorPreview">Topology</button>
             </div>
 
@@ -201,6 +201,61 @@
 
     <!-- Scripts -->
     <script type="module" src="./main.js"></script>
+
+    <!-- Metadata Modal -->
+    <div id="metadataModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Font Metadata</h2>
+                <button id="closeMetadata" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="control-group">
+                    <label>Designer</label>
+                    <input type="text" id="metaDesigner" placeholder="Your Name">
+                </div>
+                <div class="control-group">
+                    <label>Designer URL</label>
+                    <input type="text" id="metaDesignerURL" placeholder="https://yourwebsite.com">
+                </div>
+                <div class="control-group">
+                    <label>Manufacturer</label>
+                    <input type="text" id="metaManufacturer" placeholder="Foundry Name">
+                </div>
+                <div class="control-group">
+                    <label>Manufacturer URL</label>
+                    <input type="text" id="metaManufacturerURL" placeholder="https://foundry.com">
+                </div>
+                <div class="control-group">
+                    <label>Version</label>
+                    <input type="text" id="metaVersion" placeholder="1.000">
+                </div>
+                <div class="control-group">
+                    <label>Description</label>
+                    <textarea id="metaDescription" placeholder="Font description..."></textarea>
+                </div>
+                <div class="control-group">
+                    <label>Trademark</label>
+                    <input type="text" id="metaTrademark" placeholder="Trademark notification">
+                </div>
+                <div class="control-group">
+                    <label>License</label>
+                    <input type="text" id="metaLicense" placeholder="SIL Open Font License">
+                </div>
+                <div class="control-group">
+                    <label>License URL</label>
+                    <input type="text" id="metaLicenseURL" placeholder="http://scripts.sil.org/OFL">
+                </div>
+                <div class="control-group">
+                    <label>Copyright</label>
+                    <input type="text" id="metaCopyright" placeholder="© 2026 Your Name">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="saveMetadata" class="primary glow">Apply Metadata</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

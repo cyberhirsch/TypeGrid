@@ -15,7 +15,7 @@ class Typegrid {
             aspectRatio: 0.66,
             lockSquare: false,
             charSet: 'minimal',
-            gridType: 'geometric',
+            gridType: 'triangle',
             showGridLines: true,
             activeTool: 'fill',
             strokeWeight: 4,
@@ -24,7 +24,17 @@ class Typegrid {
             baseline: 5,
             meanLine: 2,
             tracking: 0,
-            previewText: 'TYPEGRID'
+            previewText: 'TYPEGRID',
+            designer: '',
+            designerURL: '',
+            manufacturer: '',
+            manufacturerURL: '',
+            version: '1.000',
+            description: '',
+            trademark: '',
+            license: '',
+            licenseURL: '',
+            copyright: ''
         };
         this.state = {
             activeChar: 'A',
@@ -34,12 +44,13 @@ class Typegrid {
         this.init();
     }
 
-    init() {
+    async init() {
         this.cacheDOM();
         this.bindEvents();
-        this.loadFromStorage();
+        await this.loadInitialData();
         this.setupGlyphs();
         this.render();
+        this.renderWordPreview();
     }
 
     /* ── DOM ─────────────────────────────────────────────────────────────── */
@@ -59,7 +70,6 @@ class Typegrid {
         this.exportBtn = document.getElementById('exportFont');
         this.downloadSVGBtn = document.getElementById('downloadSVG');
         this.clearBtn = document.getElementById('clearGlyph');
-        this.toggleGridBtn = document.getElementById('toggleGridLines');
         this.saveBtn = document.getElementById('saveProject');
         this.loadBtn = document.getElementById('loadProject');
         this.newBtn = document.getElementById('newProject');
@@ -86,6 +96,24 @@ class Typegrid {
         this.trackingSlider = document.getElementById('trackingSlider');
         this.trackingValue = document.getElementById('trackingValue');
         this.wordPreviewDisplay = document.getElementById('wordPreviewDisplay');
+
+        this.metaModal = document.getElementById('metadataModal');
+        this.editMetaBtn = document.getElementById('editMetadata');
+        this.closeMetaBtn = document.getElementById('closeMetadata');
+        this.saveMetaBtn = document.getElementById('saveMetadata');
+
+        this.metaFields = {
+            designer: document.getElementById('metaDesigner'),
+            designerURL: document.getElementById('metaDesignerURL'),
+            manufacturer: document.getElementById('metaManufacturer'),
+            manufacturerURL: document.getElementById('metaManufacturerURL'),
+            version: document.getElementById('metaVersion'),
+            description: document.getElementById('metaDescription'),
+            trademark: document.getElementById('metaTrademark'),
+            license: document.getElementById('metaLicense'),
+            licenseURL: document.getElementById('metaLicenseURL'),
+            copyright: document.getElementById('metaCopyright')
+        };
     }
 
     /* ── EVENTS ──────────────────────────────────────────────────────────── */
@@ -111,7 +139,6 @@ class Typegrid {
         this.charSetSelect.onchange = e => { this.config.charSet = e.target.value; this.refresh(); };
 
         this.clearBtn.onclick = () => { const g = this.glyph(); g.fills.clear(); g.strokes.clear(); this.refresh(); };
-        this.toggleGridBtn.onclick = () => { this.config.showGridLines = !this.config.showGridLines; this.render(); };
 
         this.btnFill.onclick = () => this.setTool('fill');
         this.btnLine.onclick = () => this.setTool('line');
@@ -144,6 +171,18 @@ class Typegrid {
             this.topoBtn.classList.toggle('active', this.config.showTopo);
             this.render();
         };
+
+        this.editMetaBtn.onclick = () => {
+            Object.keys(this.metaFields).forEach(k => this.metaFields[k].value = this.config[k] || '');
+            this.metaModal.classList.add('active');
+        };
+        this.closeMetaBtn.onclick = () => this.metaModal.classList.remove('active');
+        this.saveMetaBtn.onclick = () => {
+            Object.keys(this.metaFields).forEach(k => this.config[k] = this.metaFields[k].value);
+            this.metaModal.classList.remove('active');
+            saveToStorage(this.config, this.state.glyphs);
+        };
+        window.onclick = e => { if (e.target === this.metaModal) this.metaModal.classList.remove('active'); };
 
         this.fontNameInput.oninput = e => {
             this.config.fontName = e.target.value.trim() || 'Typegrid';
@@ -317,6 +356,32 @@ class Typegrid {
     }
 
     /* ── PERSISTENCE ─────────────────────────────────────────────────────── */
+    async loadInitialData() {
+        // Try localStorage first
+        const saved = loadFromStorage();
+        if (saved) {
+            this.config = { ...this.config, ...saved.config };
+            this.state.glyphs = saved.glyphs;
+            this.syncUI();
+            return;
+        }
+        // Fall back to the bundled default font
+        try {
+            const res = await fetch('./vectoroid.tgf');
+            if (!res.ok) throw new Error('not found');
+            const data = await res.json();
+            const glyphs = {};
+            Object.entries(data.glyphs || {}).forEach(([k, v]) => {
+                glyphs[k] = { fills: new Set(v.fills || []), strokes: new Set(v.strokes || []) };
+            });
+            this.config = { ...this.config, ...(data.config || {}) };
+            this.state.glyphs = glyphs;
+            this.syncUI();
+        } catch (e) {
+            console.warn('Could not load default font, starting fresh.', e);
+        }
+    }
+
     loadFromStorage() {
         const saved = loadFromStorage();
         if (!saved) return;

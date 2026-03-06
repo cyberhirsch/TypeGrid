@@ -15,8 +15,13 @@ export function downloadSVG(canvas, activeChar, fontName = 'typegrid') {
 }
 
 export function exportFont(state, config, format = 'ttf') {
+    // Convert UI tracking to Em units (UPM = 1000. Preview H = 60. Tracking 10 = 1px spacing)
+    // 1px at 60px H = 1/60 of height. 1/60 of 1000 UPM ≈ 16.67 units.
+    const trackingUnits = Math.round((config.tracking || 0) * 1.667);
+    const defaultWidth = Math.round(700 * (config.aspectRatio || 0.66) / 0.66) + trackingUnits;
+
     const glyphs = [
-        new opentype.Glyph({ name: '.notdef', unicode: 0, advanceWidth: 650, path: new opentype.Path() })
+        new opentype.Glyph({ name: '.notdef', unicode: 0, advanceWidth: defaultWidth, path: new opentype.Path() })
     ];
 
     Object.keys(state.glyphs).forEach(ch => {
@@ -26,7 +31,7 @@ export function exportFont(state, config, format = 'ttf') {
         glyphs.push(new opentype.Glyph({
             name: ch,
             unicode: ch.charCodeAt(0),
-            advanceWidth: 700,
+            advanceWidth: defaultWidth,
             path: buildUnionedPath(g, config)
         }));
     });
@@ -37,6 +42,16 @@ export function exportFont(state, config, format = 'ttf') {
         unitsPerEm: 1000,
         ascender: 800,
         descender: -200,
+        designer: config.designer,
+        designerURL: config.designerURL,
+        manufacturer: config.manufacturer,
+        manufacturerURL: config.manufacturerURL,
+        version: config.version,
+        description: config.description,
+        trademark: config.trademark,
+        license: config.license,
+        licenseURL: config.licenseURL,
+        copyright: config.copyright,
         glyphs
     });
 
