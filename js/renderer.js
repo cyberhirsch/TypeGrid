@@ -43,6 +43,21 @@ function drawGuides(app, svg, cw, rh, W, H, color) {
             mkLine(svg, i * cw, j * rh, (i + 1) * cw, (j + 1) * rh, color, 0.3);
             mkLine(svg, (i + 1) * cw, j * rh, i * cw, (j + 1) * rh, color, 0.3);
         }
+    } else if (config.gridType === 'hexagonal') {
+        const hW = cw, hH = rh, vd = hH * 0.75;
+        for (let i = 0; i < config.cols; i++) for (let j = 0; j < config.rows; j++) {
+            const ox = (j % 2 === 0) ? 0 : hW / 2;
+            const hx = i * hW + hW / 2 + ox, hy = j * vd + hH / 2;
+            const pts = [];
+            for (let a = 0; a < 6; a++) {
+                const an = (Math.PI / 180) * (60 * a - 30);
+                pts.push([hx + (hW / 2) * Math.cos(an), hy + (hH / 2) * Math.sin(an)]);
+            }
+            for (let a = 0; a < 6; a++) {
+                const b = (a + 1) % 6;
+                mkLine(svg, pts[a][0], pts[a][1], pts[b][0], pts[b][1], color, 0.5);
+            }
+        }
     } else if (config.gridType === 'curvature') {
         for (let i = 0; i <= config.cols; i++) for (let j = 0; j <= config.rows; j++) {
             const c = mk(svg, 'circle');
@@ -150,6 +165,21 @@ function drawLineHitZones(app, svg, cw, rh, W, H) {
             mkArcHit(svg, `M${x + s} ${y} A${s} ${s} 0 0 1 ${x} ${y + rh}`);
             mkArcHit(svg, `M${x} ${y + rh} A${s} ${s} 0 0 0 ${x + s} ${y}`);
             mkArcHit(svg, `M${x + s} ${y + rh} A${s} ${s} 0 0 1 ${x} ${y}`);
+        }
+    } else if (config.gridType === 'hexagonal') {
+        const hW = cw, hH = rh, vd = hH * 0.75;
+        for (let i = 0; i < config.cols; i++) for (let j = 0; j < config.rows; j++) {
+            const ox = (j % 2 === 0) ? 0 : hW / 2;
+            const hx = i * hW + hW / 2 + ox, hy = j * vd + hH / 2;
+            const pts = [];
+            for (let a = 0; a < 6; a++) {
+                const an = (Math.PI / 180) * (60 * a - 30);
+                pts.push([hx + (hW / 2) * Math.cos(an), hy + (hH / 2) * Math.sin(an)]);
+            }
+            for (let a = 0; a < 6; a++) {
+                const b = (a + 1) % 6;
+                mkHit(svg, pts[a][0], pts[a][1], pts[b][0], pts[b][1]);
+            }
         }
     }
 }

@@ -86,18 +86,61 @@ export function collectShapes(glyph, config, opts = {}) {
         if (id.startsWith('f-r-')) {
             const [i, j] = id.substring(4).split('-').map(Number);
             const x = i * cw, y = j * rh;
-            shapes.push(
-                rectRing(x, y, cw, rh).map(([px, py]) => tx(px, py))
-            );
+            shapes.push(rectRing(x, y, cw, rh).map(([px, py]) => tx(px, py)));
+        } else if (id.startsWith('f-t-')) {
+            const [i, j, side] = id.substring(4).split('-');
+            const I = Number(i), J = Number(j);
+            const cx = I * cw + cw / 2, cy = J * rh + rh / 2;
+            const tl = [I * cw, J * rh], tr = [(I + 1) * cw, J * rh];
+            const bl = [I * cw, (J + 1) * rh], br = [(I + 1) * cw, (J + 1) * rh], ct = [cx, cy];
+            let pts;
+            if (side === 't') pts = [tl, tr, ct];
+            else if (side === 'r') pts = [tr, br, ct];
+            else if (side === 'b') pts = [br, bl, ct];
+            else if (side === 'l') pts = [bl, tl, ct];
+            if (pts) shapes.push(pts.map(([px, py]) => tx(px, py)));
+        } else if (id.startsWith('f-c-')) {
+            const [i, j, pos] = id.substring(4).split('-');
+            const I = Number(i), J = Number(j), s = cw;
+            const x = I * cw, y = J * rh;
+            const pts = [];
+            // Simple approximation of the arcs for export
+            if (pos === 'bl') {
+                pts.push([x, y + rh]);
+                for (let a = 180; a >= 90; a -= 10) pts.push([x + s + s * Math.cos(a * Math.PI / 180), y + rh + s * Math.sin(a * Math.PI / 180)]);
+                pts.push([x + s, y + rh]);
+            } else if (pos === 'br') {
+                pts.push([x + s, y + rh]);
+                for (let a = 0; a >= -90; a -= 10) pts.push([x + s * Math.cos(a * Math.PI / 180), y + rh + s * Math.sin(a * Math.PI / 180)]);
+                pts.push([x, y + rh]);
+            } else if (pos === 'tl') {
+                pts.push([x, y]);
+                for (let a = 180; a <= 270; a += 10) pts.push([x + s + s * Math.cos(a * Math.PI / 180), y + s * Math.sin(a * Math.PI / 180)]);
+                pts.push([x + s, y]);
+            } else if (pos === 'tr') {
+                pts.push([x + s, y]);
+                for (let a = 0; a <= 90; a += 10) pts.push([x + s * Math.cos(a * Math.PI / 180), y + s * Math.sin(a * Math.PI / 180)]);
+                pts.push([x, y]);
+            }
+            if (pts.length) shapes.push(pts.map(([px, py]) => tx(px, py)));
+        } else if (id.startsWith('f-h-')) {
+            const [i, j] = id.substring(4).split('-').map(Number);
+            const hW = cw, hH = rh, vd = hH * 0.75;
+            const ox = (j % 2 === 0) ? 0 : hW / 2;
+            const hx = i * hW + hW / 2 + ox, hy = j * vd + hH / 2;
+            const pts = [];
+            for (let a = 0; a < 6; a++) {
+                const an = (Math.PI / 180) * (60 * a - 30);
+                pts.push(tx(hx + (hW / 2) * Math.cos(an), hy + (hH / 2) * Math.sin(an)));
+            }
+            shapes.push(pts);
         }
     });
 
     glyph.strokes.forEach(id => {
         if (id.startsWith('s:')) {
             const [x1, y1, x2, y2] = id.substring(2).split(',').map(Number);
-            shapes.push(
-                strokeRing(x1, y1, x2, y2, r).map(([px, py]) => tx(px, py))
-            );
+            shapes.push(strokeRing(x1, y1, x2, y2, r).map(([px, py]) => tx(px, py)));
         }
     });
 
