@@ -36,5 +36,11 @@ TypeGrid is a minimalist, grid-based font editor designed for rapid experimentat
 - **Font Generation**: Uses a custom wrapper for `opentype.js` to translate SVG paths and lines into TrueType outlines.
 - **Persistence**: Project state is serialized and managed via the Browser Web Storage API.
 
+## 💡 Inspiration & Credits
+
+This project is inspired by the pioneering work in modular and grid-based type design:
+- **Grid Type** by Katharina Nejdl
+- **Fontstruct** by Rob Meek
+
 ---
 *Created for experimental type design.*
