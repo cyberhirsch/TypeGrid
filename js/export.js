@@ -14,6 +14,30 @@ export function downloadSVG(canvas, activeChar, fontName = 'typegrid') {
     a.click();
 }
 
+export function exportPNG(canvas, name, size = 512) {
+    const svgData = new XMLSerializer().serializeToString(canvas);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    const img = new Image();
+    img.onload = () => {
+        const raster = document.createElement('canvas');
+        raster.width = size;
+        raster.height = size;
+        const ctx = raster.getContext('2d');
+        ctx.drawImage(img, 0, 0, size, size);
+        URL.revokeObjectURL(url);
+
+        raster.toBlob(blob => {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${name}-${size}.png`;
+            a.click();
+        });
+    };
+    img.src = url;
+}
+
 export function exportFont(state, config, format = 'ttf') {
     // Convert UI tracking to Em units (UPM = 1000. Preview H = 60. Tracking 10 = 1px spacing)
     // 1px at 60px H = 1/60 of height. 1/60 of 1000 UPM ≈ 16.67 units.

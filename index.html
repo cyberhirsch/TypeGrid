@@ -27,7 +27,10 @@
         <!-- Main Sidebar (Left) -->
         <aside class="sidebar-left">
             <div class="header">
-                <h1 class="logo">TYPE<span>GRID</span></h1>
+                <div class="app-switcher">
+                    <button class="app-switch-btn active" data-app="type" onclick="switchApp('type')">TYPE<span>GRID</span></button>
+                    <button class="app-switch-btn" data-app="icon" onclick="switchApp('icon')">ICON<span>GRID</span></button>
+                </div>
                 <p class="tagline">Geometric Font Synth</p>
             </div>
 
@@ -113,6 +116,24 @@
                         <span id="strokeWeightValue" class="value-bubble">4</span>
                     </div>
                     <input type="range" id="strokeWeight" min="1" max="100" value="4">
+
+                    <div class="label-row" style="margin-top: 10px;">
+                        <label for="strokeCapSelect">Stroke Cap</label>
+                    </div>
+                    <select id="strokeCapSelect" title="Endpoint style">
+                        <option value="round" selected>Rounded</option>
+                        <option value="square">Square</option>
+                        <option value="triangle">Triangle</option>
+                    </select>
+
+                    <div class="label-row" style="margin-top: 10px;">
+                        <label for="strokeJoinSelect">Stroke Join</label>
+                    </div>
+                    <select id="strokeJoinSelect" title="Corner style">
+                        <option value="round" selected>Round</option>
+                        <option value="miter">Miter</option>
+                        <option value="bevel">Bevel</option>
+                    </select>
                 </div>
 
                 <div class="control-group">
@@ -199,8 +220,178 @@
         </aside>
     </div>
 
+    <!-- Icon/Logo Grid App -->
+    <div id="iconApp" style="display:none">
+        <!-- Main Sidebar (Left) -->
+        <aside class="sidebar-left">
+            <div class="header">
+                <div class="app-switcher">
+                    <button class="app-switch-btn" data-app="type" onclick="switchApp('type')">TYPE<span>GRID</span></button>
+                    <button class="app-switch-btn active" data-app="icon" onclick="switchApp('icon')">ICON<span>GRID</span></button>
+                </div>
+                <p class="tagline">Geometric Logo &amp; Icon Synth</p>
+            </div>
+
+            <div class="persistence control-group">
+                <div class="button-row-3">
+                    <button id="iconNewProject">New</button>
+                    <button id="iconLoadProject">Load</button>
+                    <button id="iconSaveProject">Save</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="iconBrandNameInput">Brand / Project Name</label>
+                <input type="text" id="iconBrandNameInput" value="IconGrid" placeholder="Enter brand name...">
+            </div>
+
+            <div class="tool-selection control-group">
+                <label>Active Tool</label>
+                <div class="button-row">
+                    <button id="iconToolFill" class="tool-btn active">Fill</button>
+                    <button id="iconToolLine" class="tool-btn">Line</button>
+                    <button id="iconClearGlyph">Clear</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Transform</label>
+                <div class="button-row">
+                    <button id="iconFlipH">Flip H</button>
+                    <button id="iconFlipV">Flip V</button>
+                    <button id="iconRotate180">Rotate 180</button>
+                </div>
+                <div class="button-row" style="margin-top: 5px;">
+                    <button id="iconNudgeL" title="Nudge Left">←</button>
+                    <button id="iconNudgeR" title="Nudge Right">→</button>
+                    <button id="iconNudgeU" title="Nudge Up">↑</button>
+                    <button id="iconNudgeD" title="Nudge Down">↓</button>
+                </div>
+            </div>
+
+            <div class="grid-controls">
+                <div class="control-group">
+                    <label>Grid Type</label>
+                    <select id="iconGridTypeSelect">
+                        <option value="geometric">Geometric (Rect)</option>
+                        <option value="curvature">Curvature</option>
+                        <option value="triangle" selected>Triangle Split</option>
+                        <option value="hexagonal">Hexagonal</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <div class="label-row">
+                        <label for="iconRowsSlider">Rows</label>
+                        <span id="iconRowsValue" class="value-bubble">6</span>
+                    </div>
+                    <input type="range" id="iconRowsSlider" min="1" max="15" value="6">
+                </div>
+
+                <div class="control-group">
+                    <div class="label-row">
+                        <label for="iconColsSlider">Columns</label>
+                        <span id="iconColsValue" class="value-bubble">6</span>
+                    </div>
+                    <input type="range" id="iconColsSlider" min="1" max="15" value="6">
+                </div>
+
+                <div class="control-group">
+                    <div class="label-row">
+                        <label for="iconAspectSlider">Aspect Ratio</label>
+                        <span id="iconAspectValue" class="value-bubble">1.00</span>
+                    </div>
+                    <input type="range" id="iconAspectSlider" min="0.2" max="2.0" step="0.01" value="1">
+                    <div class="checkbox-row" style="margin-top: 5px;">
+                        <input type="checkbox" id="iconLockSquare" checked>
+                        <label for="iconLockSquare" style="text-transform: none; cursor: pointer;">Square Cells</label>
+                    </div>
+                </div>
+
+                <div class="control-group" id="iconStrokeControl" style="display:none;">
+                    <div class="label-row">
+                        <label for="iconStrokeWeight">Stroke Weight</label>
+                        <span id="iconStrokeWeightValue" class="value-bubble">4</span>
+                    </div>
+                    <input type="range" id="iconStrokeWeight" min="1" max="100" value="4">
+
+                    <div class="label-row" style="margin-top: 10px;">
+                        <label for="iconStrokeCapSelect">Stroke Cap</label>
+                    </div>
+                    <select id="iconStrokeCapSelect" title="Endpoint style">
+                        <option value="round" selected>Rounded</option>
+                        <option value="square">Square</option>
+                        <option value="triangle">Triangle</option>
+                    </select>
+
+                    <div class="label-row" style="margin-top: 10px;">
+                        <label for="iconStrokeJoinSelect">Stroke Join</label>
+                    </div>
+                    <select id="iconStrokeJoinSelect" title="Corner style">
+                        <option value="round" selected>Round</option>
+                        <option value="miter">Miter</option>
+                        <option value="bevel">Bevel</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="iconClearSpaceToggle">
+                        <label for="iconClearSpaceToggle" style="text-transform: none; cursor: pointer;">Show Clear-Space Guide</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="export-actions">
+                <label>Export</label>
+                <div class="button-row-3">
+                    <button id="iconDownloadSVG">SVG</button>
+                    <button id="iconExportPNGSmall">PNG 64</button>
+                    <button id="iconExportPNGLarge">PNG 512</button>
+                </div>
+            </div>
+
+            <div class="editor-actions secondary">
+                <button id="iconEditMetadata">Info</button>
+            </div>
+
+            <div class="copyright">
+                &copy; 2026 CYBERHIRSCH
+            </div>
+        </aside>
+
+        <!-- Main Workspace (Center) -->
+        <main class="workspace">
+            <div class="canvas-container">
+                <svg id="iconCanvas" viewBox="0 0 400 400">
+                    <!-- Grid and shapes will be rendered here -->
+                </svg>
+            </div>
+        </main>
+
+        <!-- Right Overview Column -->
+        <aside class="sidebar-right inventory-column">
+            <div class="inventory-header">
+                <div class="active-info">
+                    <span id="iconCurrentVariantDisplay">Primary</span>
+                </div>
+                <button id="iconAddVariant" title="Add a new variant">+ Variant</button>
+            </div>
+
+            <div class="usage-preview" id="iconUsagePreview">
+                <!-- Small usage-size previews will be rendered here -->
+            </div>
+
+            <div class="glyph-grid" id="iconVariantGrid">
+                <!-- Variant thumbnails will be here -->
+            </div>
+        </aside>
+    </div>
+
     <!-- Scripts -->
+    <script type="module" src="./js/appSwitcher.js"></script>
     <script type="module" src="./main.js"></script>
+    <script type="module" src="./js/iconApp.js"></script>
 
     <!-- Metadata Modal -->
     <div id="metadataModal" class="modal">
@@ -253,6 +444,33 @@
             </div>
             <div class="modal-footer">
                 <button id="saveMetadata" class="primary glow">Apply Metadata</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Icon Metadata Modal -->
+    <div id="iconMetadataModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Logo/Icon Metadata</h2>
+                <button id="iconCloseMetadata" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="control-group">
+                    <label>Brand / Project Name</label>
+                    <input type="text" id="iconMetaBrand" placeholder="Brand name">
+                </div>
+                <div class="control-group">
+                    <label>Primary Color</label>
+                    <input type="text" id="iconMetaColor" placeholder="#000000">
+                </div>
+                <div class="control-group">
+                    <label>Description</label>
+                    <textarea id="iconMetaDescription" placeholder="Notes about this mark..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="iconSaveMetadata" class="primary glow">Apply Metadata</button>
             </div>
         </div>
     </div>

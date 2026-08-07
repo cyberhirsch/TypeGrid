@@ -18,7 +18,7 @@ body {
 }
 
 /* ============ LAYOUT ============ */
-#app {
+#app, #iconApp {
     display: flex;
     height: 100vh;
     overflow: hidden;
@@ -157,6 +157,29 @@ input[type="text"]:focus {
     text-transform: uppercase;
     letter-spacing: 0.05rem;
 }
+
+.app-switcher { display: flex; gap: 0.4rem; }
+.app-switch-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--dim-text);
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.05rem;
+    padding: 0.3rem 0.55rem;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+}
+.app-switch-btn span { font-weight: 300; opacity: 0.7; }
+.app-switch-btn.active { color: #fff; border-color: #555; }
+.app-switch-btn:hover { color: #fff; }
+
+.usage-preview { display: flex; align-items: flex-end; gap: 0.6rem; flex-wrap: wrap; padding: 0.6rem 0 1rem; }
+.usage-swatch { display: flex; align-items: center; justify-content: center; border-radius: 4px; }
+.usage-swatch.light { background: #f2f2f2; }
+.usage-swatch.dark { background: #111; border: 1px solid var(--border-color); }
+.usage-swatch img, .usage-swatch svg { display: block; }
 
 .control-group {
     display: flex;

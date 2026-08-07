@@ -85,3 +85,73 @@ export function loadFromFile(onLoad) {
     };
     input.click();
 }
+
+/* ── ICON/LOGO GRID PERSISTENCE ─────────────────────────────────────────
+ * Same JSON shape as the font project (config + glyphs keyed by name),
+ * kept under a separate storage key/extension so the two tools don't collide.
+ */
+const ICON_STORAGE_KEY = 'icongrid_v1';
+
+export function saveIconToStorage(config, glyphs) {
+    const data = { config, glyphs: {} };
+    Object.entries(glyphs).forEach(([k, v]) => {
+        data.glyphs[k] = { fills: [...v.fills], strokes: [...v.strokes] };
+    });
+    localStorage.setItem(ICON_STORAGE_KEY, JSON.stringify(data));
+}
+
+export function loadIconFromStorage() {
+    const raw = localStorage.getItem(ICON_STORAGE_KEY);
+    if (!raw) return null;
+    try {
+        const data = JSON.parse(raw);
+        const glyphs = {};
+        Object.entries(data.glyphs).forEach(([k, v]) => {
+            glyphs[k] = { fills: new Set(v.fills), strokes: new Set(v.strokes) };
+        });
+        return { config: data.config, glyphs };
+    } catch (e) {
+        console.warn('Failed to load icon project from storage:', e);
+        return null;
+    }
+}
+
+export function saveIconToFile(config, glyphs) {
+    const data = { config, glyphs: {} };
+    Object.entries(glyphs).forEach(([k, v]) => {
+        data.glyphs[k] = { fills: [...v.fills], strokes: [...v.strokes] };
+    });
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const name = (config.brandName || 'IconGrid').replace(/\s+/g, '-');
+    a.download = `${name}.igf`;
+    a.click();
+}
+
+export function loadIconFromFile(onLoad) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.igf,.json';
+    input.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                const glyphs = {};
+                Object.entries(data.glyphs || {}).forEach(([k, v]) => {
+                    glyphs[k] = { fills: new Set(v.fills || []), strokes: new Set(v.strokes || []) };
+                });
+                onLoad({ config: data.config, glyphs });
+            } catch (err) {
+                console.warn('Failed to parse icon project file:', err);
+                alert('Invalid project file.');
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
