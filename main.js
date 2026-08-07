@@ -6,6 +6,7 @@ import { drawInto, drawGuidesOnly } from './js/renderer.js';
 import { drawTopoOverlay } from './js/topology.js';
 import { downloadSVG, exportFont } from './js/export.js';
 import { generateCharSets, saveToStorage, loadFromStorage, saveToFile, loadFromFile } from './js/storage.js';
+import { mkStrokeId, quantize } from './js/geometry.js';
 
 class Typegrid {
     constructor() {
@@ -19,6 +20,8 @@ class Typegrid {
             showGridLines: true,
             activeTool: 'fill',
             strokeWeight: 4,
+            strokeCap: 'round',
+            strokeJoin: 'round',
             showTopo: false,
             fontName: 'Typegrid',
             baseline: 5,
@@ -64,6 +67,8 @@ class Typegrid {
         this.aspectValue = document.getElementById('aspectValue');
         this.strokeSlider = document.getElementById('strokeWeight');
         this.strokeValue = document.getElementById('strokeWeightValue');
+        this.strokeCapSelect = document.getElementById('strokeCapSelect');
+        this.strokeJoinSelect = document.getElementById('strokeJoinSelect');
         this.strokeControl = document.getElementById('strokeControl');
         this.gridTypeSelect = document.getElementById('gridTypeSelect');
         this.glyphGrid = document.getElementById('glyphGrid');
@@ -133,6 +138,8 @@ class Typegrid {
         this.colsSlider.oninput = e => { this.config.cols = +e.target.value; this.colsValue.textContent = this.config.cols; this.updateSquare(); this.refresh(); };
         this.aspectSlider.oninput = e => { this.config.aspectRatio = +e.target.value; this.aspectValue.textContent = this.config.aspectRatio.toFixed(2); this.refresh(); };
         this.strokeSlider.oninput = e => { this.config.strokeWeight = +e.target.value; this.strokeValue.textContent = this.config.strokeWeight; this.render(); };
+        this.strokeCapSelect.onchange = e => { this.config.strokeCap = e.target.value; this.render(); };
+        this.strokeJoinSelect.onchange = e => { this.config.strokeJoin = e.target.value; this.render(); };
         this.lockSquareCheck.onclick = () => { this.config.lockSquare = this.lockSquareCheck.checked; this.updateSquare(); this.refresh(); };
 
         this.gridTypeSelect.onchange = e => { this.config.gridType = e.target.value; this.refresh(); };
@@ -292,10 +299,10 @@ class Typegrid {
     getEdgeNodes(id) {
         if (id.startsWith('s:')) {
             const [x1, y1, x2, y2] = id.substring(2).split(',').map(Number);
-            return [`${x1.toFixed(1)},${y1.toFixed(1)}`, `${x2.toFixed(1)},${y2.toFixed(1)}`];
+            return [`${quantize(x1).toFixed(1)},${quantize(y1).toFixed(1)}`, `${quantize(x2).toFixed(1)},${quantize(y2).toFixed(1)}`];
         } else if (id.startsWith('a:')) {
-            const parts = id.match(/M([\d.-]+)\s+([\d.-]+)\s+A.*?\s+([\d.-]+)\s+([\d.-]+)$/);
-            if (parts) return [`${Number(parts[1]).toFixed(1)},${Number(parts[2]).toFixed(1)}`, `${Number(parts[3]).toFixed(1)},${Number(parts[4]).toFixed(1)}`];
+            const parts = id.match(/M\s*([\d.-]+)\s+([\d.-]+)\s+A.*?\s+([\d.-]+)\s+([\d.-]+)$/);
+            if (parts) return [`${quantize(Number(parts[1])).toFixed(1)},${quantize(Number(parts[2])).toFixed(1)}`, `${quantize(Number(parts[3])).toFixed(1)},${quantize(Number(parts[4])).toFixed(1)}`];
         }
         return null;
     }
@@ -400,6 +407,8 @@ class Typegrid {
         this.rowsValue.textContent = this.config.rows;
         this.colsValue.textContent = this.config.cols;
         this.aspectValue.textContent = this.config.aspectRatio.toFixed(2);
+        this.strokeCapSelect.value = this.config.strokeCap || 'round';
+        this.strokeJoinSelect.value = this.config.strokeJoin || 'round';
         this.lockSquareCheck.checked = !!this.config.lockSquare;
 
         if (!this.state.charSets[this.config.charSet]) this.config.charSet = 'minimal';
@@ -457,8 +466,8 @@ class Typegrid {
         g.strokes.forEach(id => {
             if (id.startsWith('s:')) {
                 const [x1, y1, x2, y2] = id.substring(2).split(',').map(Number);
-                if (axis === 'H') newStrokes.add(`s:${(W - x1).toFixed(1)},${y1.toFixed(1)},${(W - x2).toFixed(1)},${y2.toFixed(1)}`);
-                else newStrokes.add(`s:${x1.toFixed(1)},${(H - y1).toFixed(1)},${x2.toFixed(1)},${(H - y2).toFixed(1)}`);
+                if (axis === 'H') newStrokes.add(mkStrokeId(W - x1, y1, W - x2, y2));
+                else newStrokes.add(mkStrokeId(x1, H - y1, x2, H - y2));
             } else if (id.startsWith('a:')) {
                 const m = id.match(/M([\d.-]+)\s+([\d.-]+)\s+A([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)/);
                 if (m) {

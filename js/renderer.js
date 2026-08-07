@@ -2,6 +2,7 @@
  * Rendering: drawInto, drawGuides, drawFills, drawStrokes, drawLineHitZones
  */
 import { mk, mkLine, mkHit, mkArcHit, mkPoly, mkPath } from './primitives.js';
+import { strokeRing, mkStrokeId } from './geometry.js';
 
 export function drawInto(app, svg, ch, W, H, interactive) {
     const { config } = app;
@@ -81,8 +82,9 @@ function drawGuides(app, svg, cw, rh, W, H, color) {
         }
     } else if (config.gridType === 'curvature') {
         for (let i = 0; i <= config.cols; i++) for (let j = 0; j <= config.rows; j++) {
-            const c = mk(svg, 'circle');
-            c.setAttribute('cx', i * cw); c.setAttribute('cy', j * rh); c.setAttribute('r', cw);
+            const c = mk(svg, 'ellipse');
+            c.setAttribute('cx', i * cw); c.setAttribute('cy', j * rh);
+            c.setAttribute('rx', cw); c.setAttribute('ry', rh);
             c.setAttribute('fill', 'none'); c.setAttribute('stroke', color);
             c.setAttribute('stroke-width', '0.5');
         }
@@ -136,15 +138,16 @@ function drawFills(app, svg, ch, cw, rh, interactive) {
                 if (canClick) r.setAttribute('data-id', q.id);
             });
 
-            // Visual Fills (4 Overlapping Quarter Circles)
-            // tl: center(x,y), arc from (x+s,y) to (x,y+s)
-            if (fills.has(`f-c-${i}-${j}-tl`)) { const p = mk(svg, 'path'); p.setAttribute('d', `M${x} ${y} L${x + s} ${y} A${s} ${s} 0 0 1 ${x} ${y + s} Z`); p.setAttribute('fill', '#fff'); p.style.pointerEvents = 'none'; }
-            // tr: center(x+s,y), arc from (x,y) to (x+s,y+s)
-            if (fills.has(`f-c-${i}-${j}-tr`)) { const p = mk(svg, 'path'); p.setAttribute('d', `M${x + s} ${y} L${x} ${y} A${s} ${s} 0 0 0 ${x + s} ${y + s} Z`); p.setAttribute('fill', '#fff'); p.style.pointerEvents = 'none'; }
-            // bl: center(x,y+s), arc from (x,y) to (x+s,y+s)
-            if (fills.has(`f-c-${i}-${j}-bl`)) { const p = mk(svg, 'path'); p.setAttribute('d', `M${x} ${y + s} L${x} ${y} A${s} ${s} 0 0 1 ${x + s} ${y + s} Z`); p.setAttribute('fill', '#fff'); p.style.pointerEvents = 'none'; }
-            // br: center(x+s,y+s), arc from (x+s,y) to (x,y+s)
-            if (fills.has(`f-c-${i}-${j}-br`)) { const p = mk(svg, 'path'); p.setAttribute('d', `M${x + s} ${y + s} L${x + s} ${y} A${s} ${s} 0 0 0 ${x} ${y + s} Z`); p.setAttribute('fill', '#fff'); p.style.pointerEvents = 'none'; }
+            // Visual Fills (4 Overlapping Elliptical Quarter Circles)
+            const sx = cw, sy = rh;
+            // tl: center(x,y), arc from (x+sx,y) to (x,y+sy)
+            if (fills.has(`f-c-${i}-${j}-tl`)) { const p = mk(svg, 'path'); p.setAttribute('d', `M${x} ${y} L${x + sx} ${y} A${sx} ${sy} 0 0 1 ${x} ${y + sy} Z`); p.setAttribute('fill', '#fff'); p.style.pointerEvents = 'none'; }
+            // tr: center(x+sx,y), arc from (x,y) to (x+sx,y+sy)
+            if (fills.has(`f-c-${i}-${j}-tr`)) { const p = mk(svg, 'path'); p.setAttribute('d', `M${x + sx} ${y} L${x} ${y} A${sx} ${sy} 0 0 0 ${x + sx} ${y + sy} Z`); p.setAttribute('fill', '#fff'); p.style.pointerEvents = 'none'; }
+            // bl: center(x,y+sy), arc from (x,y) to (x+sx,y+sy)
+            if (fills.has(`f-c-${i}-${j}-bl`)) { const p = mk(svg, 'path'); p.setAttribute('d', `M${x} ${y + sy} L${x} ${y} A${sx} ${sy} 0 0 1 ${x + sx} ${y + sy} Z`); p.setAttribute('fill', '#fff'); p.style.pointerEvents = 'none'; }
+            // br: center(x+sx,y+sy), arc from (x+sx,y) to (x,y+sy)
+            if (fills.has(`f-c-${i}-${j}-br`)) { const p = mk(svg, 'path'); p.setAttribute('d', `M${x + sx} ${y + sy} L${x + sx} ${y} A${sx} ${sy} 0 0 0 ${x} ${y + sy} Z`); p.setAttribute('fill', '#fff'); p.style.pointerEvents = 'none'; }
 
         } else if (gt === 'hexagonal') {
             // Use the same vertex math as drawGuides
@@ -164,72 +167,229 @@ function drawFills(app, svg, ch, cw, rh, interactive) {
 }
 
 function drawStrokes(app, svg, ch) {
-    const { config, state } = app;
+    try {
+        const { config, state } = app;
+        const glyph = app.glyph(ch);
+        const strokes = glyph.strokes;
+        const previewStrokes = (ch === state.activeChar && state.previewPath) ? state.previewPath : [];
+        const allStrokes = [...strokes, ...previewStrokes];
+        const ID_TO_PREVIEW = new Set(previewStrokes);
 
-    const renderStroke = (id, color) => {
-        if (id.startsWith('s:')) {
-            const parts = id.substring(2).split(',').map(Number);
-            mkLine(svg, parts[0], parts[1], parts[2], parts[3], color, config.strokeWeight);
-        } else if (id.startsWith('a:')) {
-            const pathData = id.substring(2);
+        // 1. Build Adjacency Graph
+        const graph = new Map();
+        allStrokes.forEach(id => {
+            let edge;
+            if (id.startsWith('s:')) {
+                const parts = id.substring(2).split(',').map(v => Number(v));
+                const p1 = [parts[0], parts[1]], p2 = [parts[2], parts[3]];
+                const n1 = `${p1[0].toFixed(1)},${p1[1].toFixed(1)}`;
+                const n2 = `${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+                edge = { id, type: 'line', n1, n2, p1, p2 };
+            } else if (id.startsWith('a:')) {
+                const d = id.substring(2);
+                const m = d.match(/M\s*([\d.-]+)\s+([\d.-]+)\s+A\s*([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([01])\s+([01])\s+([\d.-]+)\s+([\d.-]+)/);
+                if (m) {
+                    const [_, x1, y1, rx, ry, rot, laf, swf, x2, y2] = m.map(Number);
+                    const p1 = [x1, y1], p2 = [x2, y2];
+                    const n1 = `${p1[0].toFixed(1)},${p1[1].toFixed(1)}`;
+                    const n2 = `${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+                    edge = { id, type: 'arc', n1, n2, p1, p2, rx, ry, rot, laf, swf };
+                }
+            }
+            if (edge) {
+                if (!graph.has(edge.n1)) graph.set(edge.n1, []);
+                if (!graph.has(edge.n2)) graph.set(edge.n2, []);
+                graph.get(edge.n1).push(edge);
+                graph.get(edge.n2).push(edge);
+            }
+        });
+
+        // 2. Extract Paths (Chains)
+        const visited = new Set();
+        const paths = [];
+
+        const getPath = (startNode, startEdge) => {
+            const path = { segments: [], nodes: [startNode] };
+            let currNode = startNode;
+            let currEdge = startEdge;
+
+            while (currEdge && !visited.has(currEdge.id)) {
+                visited.add(currEdge.id);
+                const isForward = (currEdge.n1 === currNode);
+                const nextNode = isForward ? currEdge.n2 : currEdge.n1;
+
+                path.segments.push({ ...currEdge, isForward });
+                path.nodes.push(nextNode);
+
+                currNode = nextNode;
+                const neighbors = (graph.get(currNode) || []).filter(e => !visited.has(e.id));
+                currEdge = neighbors.length > 0 ? neighbors[0] : null;
+            }
+            return path;
+        };
+
+        // Pass 1: Terminals
+        graph.forEach((nodeEdges, node) => {
+            if (nodeEdges.length === 1) {
+                const unvisited = nodeEdges.filter(e => !visited.has(e.id));
+                if (unvisited.length > 0) paths.push(getPath(node, unvisited[0]));
+            }
+        });
+        // Pass 2: Branching
+        graph.forEach((nodeEdges, node) => {
+            if (nodeEdges.length > 2) {
+                const unvisited = nodeEdges.filter(e => !visited.has(e.id));
+                unvisited.forEach(edge => paths.push(getPath(node, edge)));
+            }
+        });
+        // Pass 3: Loops
+        graph.forEach((nodeEdges, node) => {
+            const unvisited = nodeEdges.filter(e => !visited.has(e.id));
+            unvisited.forEach(edge => paths.push(getPath(node, edge)));
+        });
+
+        // 3. Render Paths
+        paths.forEach(path => {
+            if (path.segments.length === 0) return;
+            const isPreview = path.segments.some(seg => ID_TO_PREVIEW.has(seg.id));
+            const color = isPreview ? (state.previewMode === 'erase' ? '#ff3333' : '#44ff44') : '#fff';
+
             const p = mk(svg, 'path');
-            p.setAttribute('d', pathData);
+            const startSeg = path.segments[0];
+            const startPt = startSeg.isForward ? startSeg.p1 : startSeg.p2;
+            let d = `M ${startPt[0]} ${startPt[1]}`;
+
+            path.segments.forEach(seg => {
+                const endPt = seg.isForward ? seg.p2 : seg.p1;
+                if (seg.type === 'line') {
+                    d += ` L ${endPt[0]} ${endPt[1]}`;
+                } else {
+                    const swf = seg.isForward ? seg.swf : (1 - seg.swf);
+                    d += ` A ${seg.rx} ${seg.ry} ${seg.rot} ${seg.laf} ${swf} ${endPt[0]} ${endPt[1]}`;
+                }
+            });
+
+            p.setAttribute('d', d);
             p.setAttribute('fill', 'none');
             p.setAttribute('stroke', color);
             p.setAttribute('stroke-width', config.strokeWeight);
-            p.setAttribute('stroke-linecap', 'round');
+            p.setAttribute('stroke-linejoin', config.strokeJoin || 'round');
+            p.setAttribute('stroke-linecap', 'butt');
             p.style.pointerEvents = 'none';
-        }
-    };
 
-    // Draw committed strokes
-    app.glyph(ch).strokes.forEach(id => renderStroke(id, '#fff'));
+            // 4. Terminal Capping
+            const capStyle = config.strokeCap || 'round';
+            const r = config.strokeWeight / 2;
+            const ends = [
+                { node: path.nodes[0], seg: path.segments[0], side: 'start' },
+                { node: path.nodes[path.nodes.length - 1], seg: path.segments[path.segments.length - 1], side: 'end' }
+            ];
 
-    // Draw preview strokes (if any) superimposed
-    if (state.previewPath && ch === state.activeChar) {
-        const pColor = state.previewMode === 'erase' ? '#ff3333' : '#44ff44';
-        state.previewPath.forEach(id => renderStroke(id, pColor));
+            ends.forEach(end => {
+                if ((graph.get(end.node) || []).length > 1) return;
+
+                // Simple tangent calculation for caps
+                const p1 = end.seg.isForward ? end.seg.p1 : end.seg.p2;
+                const p2 = end.seg.isForward ? end.seg.p2 : end.seg.p1;
+
+                // For arcs, the terminal tangent is approx from the neighbor point on the chord
+                // but since we usually use square/triangle caps on stems, this is good enough.
+                const pt = end.side === 'start' ? p1 : p2;
+                const adj = end.side === 'start' ? p2 : p1;
+
+                const dx = pt[0] - adj[0], dy = pt[1] - adj[1];
+                const len = Math.sqrt(dx * dx + dy * dy);
+                if (len < 0.1) return;
+                const nx = dx / len, ny = dy / len;
+                const px = -ny * r, py = nx * r;
+
+                if (capStyle === 'round') {
+                    const c = mk(svg, 'circle');
+                    c.setAttribute('cx', pt[0]); c.setAttribute('cy', pt[1]);
+                    c.setAttribute('r', r); c.setAttribute('fill', color); c.style.pointerEvents = 'none';
+                } else if (capStyle === 'square') {
+                    const sx = nx * r, sy = ny * r;
+                    const poly = mk(svg, 'polygon');
+                    poly.setAttribute('points', `${pt[0] + px},${pt[1] + py} ${pt[0] + px + sx},${pt[1] + py + sy} ${pt[0] - px + sx},${pt[1] - py + sy} ${pt[0] - px},${pt[1] - py}`);
+                    poly.setAttribute('fill', color); poly.style.pointerEvents = 'none';
+                } else if (capStyle === 'triangle') {
+                    const sx = nx * r, sy = ny * r;
+                    const poly = mk(svg, 'polygon');
+                    poly.setAttribute('points', `${pt[0] + px},${pt[1] + py} ${pt[0] + sx},${pt[1] + sy} ${pt[0] - px},${pt[1] - py}`);
+                    poly.setAttribute('fill', color); poly.style.pointerEvents = 'none';
+                }
+            });
+        });
+    } catch (e) {
+        console.error('drawStrokes failed:', e);
     }
 }
 
 function drawLineHitZones(app, svg, cw, rh, W, H) {
-    const { config } = app;
-    for (let i = 0; i <= config.cols; i++)
-        for (let j = 0; j < config.rows; j++)
-            mkHit(svg, i * cw, j * rh, i * cw, (j + 1) * rh);
+    const { config, state } = app;
+    const canClick = config.activeTool === 'line';
+    if (!canClick) return;
 
-    for (let j = 0; j <= config.rows; j++)
-        for (let i = 0; i < config.cols; i++)
-            mkHit(svg, i * cw, j * rh, (i + 1) * cw, j * rh);
+    // We still draw invisible hit zones for every grid segment to make selection easy
+    const glyph = app.glyph(state.activeChar);
+    const existing = new Set(glyph.strokes);
 
-    if (config.gridType === 'triangle') {
-        for (let i = 0; i < config.cols; i++) for (let j = 0; j < config.rows; j++) {
-            mkHit(svg, i * cw, j * rh, (i + 1) * cw, (j + 1) * rh);
-            mkHit(svg, (i + 1) * cw, j * rh, i * cw, (j + 1) * rh);
+    // This part depends on the grid type
+    const drawZone = (x1, y1, x2, y2, id) => {
+        const active = existing.has(id);
+        mkHit(svg, x1, y1, x2, y2, id, active);
+    };
+
+    if (config.gridType !== 'hexagonal') {
+        for (let i = 0; i <= config.cols; i++) {
+            for (let j = 0; j <= config.rows; j++) {
+                const x = i * cw, y = j * rh;
+                if (i < config.cols) drawZone(x, y, x + cw, y, mkStrokeId(x, y, x + cw, y));
+                if (j < config.rows) drawZone(x, y, x, y + rh, mkStrokeId(x, y, x, y + rh));
+
+                if (config.gridType === 'triangle' && i < config.cols && j < config.rows) {
+                    drawZone(x, y, x + cw, y + rh, mkStrokeId(x, y, x + cw, y + rh));
+                    drawZone(x + cw, y, x, y + rh, mkStrokeId(x + cw, y, x, y + rh));
+                }
+            }
         }
-    } else if (config.gridType === 'curvature') {
-        for (let i = 0; i <= config.cols; i++) for (let j = 0; j <= config.rows; j++) {
-            const x = i * cw, y = j * rh, s = cw;
-            mkArcHit(svg, `M${x} ${y} A${s} ${s} 0 0 0 ${x + s} ${y + rh}`);
-            mkArcHit(svg, `M${x + s} ${y} A${s} ${s} 0 0 1 ${x} ${y + rh}`);
-            mkArcHit(svg, `M${x} ${y + rh} A${s} ${s} 0 0 0 ${x + s} ${y}`);
-            mkArcHit(svg, `M${x + s} ${y + rh} A${s} ${s} 0 0 1 ${x} ${y}`);
+
+        if (config.gridType === 'curvature') {
+            const sx = cw, sy = rh;
+            for (let i = 0; i < config.cols; i++) {
+                for (let j = 0; j < config.rows; j++) {
+                    const x = i * cw, y = j * rh;
+                    // TL, TR, BL, BR center quadrant arcs (elliptical to fit aspect ratio)
+                    const arcs = [
+                        `M ${x + sx} ${y} A ${sx} ${sy} 0 0 1 ${x} ${y + sy}`,
+                        `M ${x} ${y} A ${sx} ${sy} 0 0 0 ${x + sx} ${y + sy}`,
+                        `M ${x} ${y} A ${sx} ${sy} 0 0 1 ${x + sx} ${y + sy}`,
+                        `M ${x + sx} ${y + sy} A ${sx} ${sy} 0 0 0 ${x} ${y + sy}`
+                    ];
+                    arcs.forEach(d => mkArcHit(svg, d, existing.has(`a:${d}`)));
+                }
+            }
         }
     } else if (config.gridType === 'hexagonal') {
-        for (let j = 0; j < config.rows; j++) {
+        for (let j = 0; j <= config.rows; j++) {
             const dx = (j % 2) * 0.5 * cw;
             const dn = ((j + 1) % 2) * 0.5 * cw;
-            for (let i = -1; i <= config.cols + 1; i++) {
-                const x = i * cw + dx, y = j * rh;
-                const targetL = (i - (j % 2 ? 0 : 1)) * cw + dn;
-                const targetR = (i + (j % 2 ? 1 : 0)) * cw + dn;
-                mkHit(svg, x, y, targetL, (j + 1) * rh);
-                mkHit(svg, x, y, targetR, (j + 1) * rh);
-                if (i < config.cols) mkHit(svg, x, y, (i + 1) * cw + dx, y);
+            const y = j * rh;
+            const yBelow = (j + 1) * rh;
+
+            for (let i = 0; i <= config.cols; i++) {
+                const x = i * cw + dx;
+                if (i < config.cols) drawZone(x, y, (i + 1) * cw + dx, y, mkStrokeId(x, y, (i + 1) * cw + dx, y));
+                if (j < config.rows) {
+                    const targetL = (i - (j % 2 ? 0 : 1)) * cw + dn;
+                    const targetR = (i + (j % 2 ? 1 : 0)) * cw + dn;
+                    if (targetL >= -cw && targetL <= config.cols * cw + cw) drawZone(x, y, targetL, yBelow, mkStrokeId(x, y, targetL, yBelow));
+                    if (targetR >= -cw && targetR <= config.cols * cw + cw) drawZone(x, y, targetR, yBelow, mkStrokeId(x, y, targetR, yBelow));
+                }
             }
         }
         // Last row horizontal hits
         const lastY = config.rows * rh, lastDx = (config.rows % 2) * 0.5 * cw;
-        for (let i = 0; i < config.cols; i++) mkHit(svg, i * cw + lastDx, lastY, (i + 1) * cw + lastDx, lastY);
+        for (let i = 0; i < config.cols; i++) drawZone(i * cw + lastDx, lastY, (i + 1) * cw + lastDx, lastY, mkStrokeId(i * cw + lastDx, lastY, (i + 1) * cw + lastDx, lastY));
     }
 }

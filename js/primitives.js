@@ -11,31 +11,32 @@ export function mk(svg, tag) {
     return el;
 }
 
-export function mkLine(svg, x1, y1, x2, y2, color, sw) {
+export function mkLine(svg, x1, y1, x2, y2, color, sw, cap = 'round') {
     const l = mk(svg, 'line');
     l.setAttribute('x1', x1); l.setAttribute('y1', y1);
     l.setAttribute('x2', x2); l.setAttribute('y2', y2);
     l.setAttribute('stroke', color);
     l.setAttribute('stroke-width', sw);
-    l.setAttribute('stroke-linecap', 'round');
+    l.setAttribute('stroke-linecap', cap === 'triangle' ? 'butt' : cap);
     l.style.pointerEvents = 'none';
 }
 
-export function mkHit(svg, x1, y1, x2, y2) {
+export function mkHit(svg, x1, y1, x2, y2, id, active, onclick) {
     const l = mk(svg, 'line');
     l.setAttribute('x1', x1); l.setAttribute('y1', y1);
     l.setAttribute('x2', x2); l.setAttribute('y2', y2);
-    l.setAttribute('stroke', 'rgba(255,255,255,0.01)');
+    l.setAttribute('stroke', active ? 'rgba(68,255,68,0.3)' : 'rgba(255,255,255,0.01)');
     l.setAttribute('stroke-width', '12');
-    l.setAttribute('data-id', `s:${x1},${y1},${x2},${y2}`);
+    l.setAttribute('data-id', id);
     l.style.cursor = 'crosshair';
+    if (onclick) l.onclick = onclick;
 }
 
-export function mkArcHit(svg, d) {
+export function mkArcHit(svg, d, active) {
     const p = mk(svg, 'path');
     p.setAttribute('d', d);
     p.setAttribute('fill', 'none');
-    p.setAttribute('stroke', 'rgba(255,255,255,0.01)');
+    p.setAttribute('stroke', active ? 'rgba(68,255,68,0.3)' : 'rgba(255,255,255,0.01)');
     p.setAttribute('stroke-width', '12');
     p.setAttribute('data-id', `a:${d}`);
     p.style.cursor = 'crosshair';
