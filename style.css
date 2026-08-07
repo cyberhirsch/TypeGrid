@@ -77,7 +77,7 @@ input[type="text"]:focus {
     border: 1px solid var(--border-color);
 }
 
-#editorCanvas {
+#editorCanvas, #iconCanvas {
     display: block;
     height: 100%;
     width: auto;
