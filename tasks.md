@@ -11,14 +11,14 @@ design decision before coding starts.
 
 ### Haiku
 
-- [ ] **Fix syntax error in `js/iconApp.js`** — the undo/redo edit deleted the
+- [x] **Fix syntax error in `js/iconApp.js`** — the undo/redo edit deleted the
   `async init() {` method signature but left its body (`cacheDOM()`,
   `bindEvents()`, `loadInitialData()`, ...) sitting in the class body outside
   any method. Currently breaks the file — Vite 500s on it, so nothing in
   IconGrid runs. Re-wrap that body in `async init() {}` and call it from the
   constructor. Blocks the undo/redo and Topology features below and the
   seam-artifact repro, so do this one first.
-- [ ] **Fix variant rename (dead code)** — in `js/iconApp.js`, `item.onclick`
+- [x] **Fix variant rename (dead code)** — in `js/iconApp.js`, `item.onclick`
   calls `refresh()` which does `innerHTML = ''` and rebuilds the variant list,
   detaching the node before the second click of a double-click can land. The
   `ondblclick` handler never fires. Needs a rename affordance that survives
@@ -26,21 +26,21 @@ design decision before coding starts.
   `e.detail === 2` inside a single click handler before the list re-renders).
   Pair with the popup-replacement feature below, since rename's `prompt()`
   needs replacing too.
-- [ ] **Make `usage-preview` swatches show the mark, not the grid** — `drawInto`
+- [x] **Make `usage-preview` swatches show the mark, not the grid** — `drawInto`
   always draws grid guides when `interactive` is falsy
   ([js/renderer.js:30](js/renderer.js:30)). Add a `showGuides` option so
   `renderUsagePreview()` in `js/iconApp.js` can render just the shape at
   16/32/64px instead of a grey mesh.
-- [ ] **Make `primaryColor` actually apply, or rename it** — it currently only
+- [x] **Make `primaryColor` actually apply, or rename it** — it currently only
   affects SVG/PNG export fill; the live canvas always renders white
   (`fill="#fff"` hardcoded in `js/renderer.js`, `js/primitives.js`). Either
   apply it to on-canvas fills/strokes too, or relabel the field "Export Color"
   so the mismatch isn't surprising.
-- [ ] **Guard `localStorage.setItem` calls** in `js/storage.js` — quota errors
+- [x] **Guard `localStorage.setItem` calls** in `js/storage.js` — quota errors
   (private browsing, storage full) currently throw uncaught and silently kill
   autosave on every subsequent edit. Wrap in try/catch and surface a one-time
   warning.
-- [ ] **Validate project file shape on load** — `loadFromFile`/`loadIconFromFile`
+- [x] **Validate project file shape on load** — `loadFromFile`/`loadIconFromFile`
   in `js/storage.js` don't check that a loaded `.tgf`/`.igf` actually matches
   the expected shape, so loading the wrong file type (e.g. a `.tgf` into
   IconGrid) silently produces garbage variant names instead of a clear error.
@@ -79,7 +79,7 @@ design decision before coding starts.
   During an active drag, update only the active thumbnail; do the full
   thumbnail rebuild once on `pointerup`. Applies to both `main.js` and
   `js/iconApp.js`.
-- [ ] **Vendor `opentype.js` and `polygon-clipping`** instead of loading them
+- [x] **Vendor `opentype.js` and `polygon-clipping`** instead of loading them
   from jsdelivr/esm.sh CDNs at runtime (`index.html`). Contradicts the
   "zero-dependency, no build process" claim in `prd.md` §5 and means a CDN
   outage or offline use breaks the app entirely. Download both into
