@@ -9,44 +9,22 @@ design decision before coding starts.
 
 ## Phase 1 — Bugs
 
-All Haiku- and Sonnet-tier Phase 1 bugs are done — see [CHANGELOG.md](CHANGELOG.md)
-("IconGrid Stabilization"). Only the two architectural Opus items remain open:
+**Complete.** All Phase 1 items, including both architectural Opus items
+(stroke-identity unification and the shared `js/gridEditor.js` base class), are
+done and recorded in [CHANGELOG.md](CHANGELOG.md) under "IconGrid Stabilization".
 
-### Opus
+Two notes carried forward for Phase 2 work:
 
-- [ ] **Unify the stroke identity model — the root cause behind three bugs.**
-  Fills are addressed by grid topology (`f-t-1-4-t`, stable across grid
-  changes). Strokes are addressed by absolute pixel coordinates
-  (`s:0.0,200.0,100.0,300.0`) and by a literal SVG arc `d` string
-  (`a:M 100 0 A 100 100 ...`). This asymmetry is why:
-  - Flip/nudge on curvature grids parses arc ids with a regex that doesn't
-    match the renderer's own arc-id format, so arcs are silently deleted
-    instead of transformed.
-  - Changing rows/cols orphans existing strokes — they still render but are
-    no longer addressable by any hit zone, so they can't be erased or
-    extended.
-  - Two independent geometry bugs (malformed br-arc hit zone, swapped
-    swf=0 angles in `collectShapes`) both stemmed from arc geometry being
-    encoded as a rendering string instead of a stable topological id.
-
-  Fix: give strokes a topology-based id (analogous to fills — cell + edge,
-  e.g. `s-r-2-3-diag`) and derive pixel/arc geometry from grid config at
-  render time, the same way fills already work. Touches `js/geometry.js`,
-  `js/renderer.js`, `main.js`, and `js/iconApp.js` simultaneously, and needs
-  a migration path for existing saved `.tgf`/`.igf` files using the old
-  format. Requires a design decision on the id scheme before implementation.
-
-- [ ] **Extract a shared editor base class for Typegrid and IconGrid.**
-  `js/iconApp.js` duplicates ~350 lines of `main.js` (pointer handling,
-  flip/nudge transforms, path-finding, DOM-binding boilerplate) because the
-  two were built in parallel rather than one being refactored to serve both.
-  Concretely costly today: the arc-transform bug and the undo/redo feature
-  both need to be implemented/fixed twice. Extract the generic drawing/
-  transform/persistence plumbing into a shared base (e.g. `js/gridEditor.js`)
-  that both `Typegrid` and `IconGrid` extend, leaving only char-set/word-preview/
-  font-export vs. variant-list/usage-preview/SVG-PNG-export as the actual
-  differences. Best done together with the stroke-identity fix above, since
-  both touch the same transform methods.
+- Stroke ids are now topological (`s-h-2-3`, `s-c-1-4-br`, `s-xh/xl/xr-i-j`),
+  defined in [js/strokeId.js](js/strokeId.js). `gridStrokeIds(config)` is the
+  single source of truth for what exists on a grid — the renderer draws exactly
+  those hit zones and transforms validate against them, so an unaddressable
+  stroke is now unrepresentable. **Any new grid type must extend that module**
+  (id kind, `strokeGeom` case, `gridStrokeIds` enumeration, and flip/nudge
+  mapping) rather than adding another per-type branch in the renderer.
+- Shared editor logic lives in [js/gridEditor.js](js/gridEditor.js). New
+  behaviour that applies to both tools (undo/redo, keyboard shortcuts, inline
+  modals) belongs there, not duplicated into both controllers.
 
 ## Phase 2 — Features
 

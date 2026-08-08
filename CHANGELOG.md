@@ -2,6 +2,11 @@
 
 ### [Unreleased] – 2026-08-08
 **"IconGrid Stabilization"** — Phase 1 bug-fix pass on the new IconGrid tool.
+*   **Fixed**: Flip and nudge silently deleted every curvature arc. Three hand-rolled arc regexes had diverged — the renderer emitted `M 100 0 A ...` while flip/nudge matched `M100 0 A100 ...` — so the match failed and the arc was dropped instead of transformed.
+*   **Fixed**: Changing rows/columns orphaned existing strokes: they kept rendering but no longer matched any hit zone, so they could not be erased or extended.
+*   **Changed**: Strokes are now addressed by grid topology (`s-h-2-3`, `s-c-1-4-br`) like fills have always been, instead of by absolute pixel coordinates and literal SVG path strings. Pixel geometry is derived from the grid config at render time, so transforms are integer arithmetic and flips are exact involutions. Saved `.tgf`/`.igf` projects migrate automatically on load — the bundled `vectoroid.tgf` (189 glyphs, 1073 strokes) converts with zero loss and byte-identical export output.
+*   **Changed**: Extracted `js/gridEditor.js`, a shared base class for both tools. IconGrid previously duplicated ~350 lines of Typegrid's pointer handling, transforms and path-finding, so every fix had to be written twice; the two controllers shrank from 1220 lines to 649 plus 330 shared.
+*   **Fixed**: Arcs meeting lines are now treated as a joint rather than two terminals, since `collectShapes` builds one connectivity graph over both.
 *   **Fixed**: `js/iconApp.js` syntax error that 500'd the dev server and broke IconGrid entirely (orphaned `init()` body left outside any method after an earlier undo/redo edit).
 *   **Fixed**: Variant rename — double-click never fired because the single-click handler rebuilt the list first; now detects double-click via `e.detail === 2` before refreshing.
 *   **Fixed**: Usage-preview swatches showed grid guides instead of a clean mark; added a `showGuides` option to `drawInto()`.
