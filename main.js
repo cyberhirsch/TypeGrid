@@ -218,7 +218,7 @@ class Typegrid {
                 this.state.previewMode = drawMode;
                 this.state.previewPath = [id];
             }
-            this.refresh();
+            this.render();
         });
 
         this.canvas.addEventListener('pointermove', e => {
@@ -231,7 +231,7 @@ class Typegrid {
             if (id.startsWith('f-') && id !== lastFillId) {
                 if (drawMode === 'draw') g.fills.add(id); else g.fills.delete(id);
                 lastFillId = id;
-                this.refresh();
+                this.render();
             } else if ((id.startsWith('s:') || id.startsWith('a:')) && startEdgeId) {
                 if (id !== startEdgeId) {
                     const path = this.findPath(startEdgeId, id);
@@ -239,7 +239,7 @@ class Typegrid {
                 } else {
                     this.state.previewPath = [startEdgeId];
                 }
-                this.refresh();
+                this.render();
             }
         });
 
