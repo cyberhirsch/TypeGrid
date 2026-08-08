@@ -13,6 +13,36 @@ export function mkStrokeId(x1, y1, x2, y2) {
 }
 
 /**
+ * Sample points along a quadrant arc from (x1,y1) to (x2,y2) with radii (rx,ry)
+ * and SVG sweep flag `swf`. Used both by collectShapes (to build stroke bodies)
+ * and by geometry tests (to assert the arc actually stays within its own
+ * quadrant instead of bulging into a neighboring cell — the failure mode of
+ * the two historical arc bugs: a malformed br-arc endpoint and swapped
+ * swf=0 start/end angles).
+ */
+export function sampleArc(x1, y1, rx, ry, swf, x2, y2, steps = 12) {
+    let cx, cy, startAng, endAng;
+    if (swf === 1) {
+        if (x1 < x2 && y1 < y2) { cx = x1; cy = y2; startAng = -Math.PI / 2; endAng = 0; }
+        else if (x1 > x2 && y1 < y2) { cx = x2; cy = y1; startAng = 0; endAng = Math.PI / 2; }
+        else if (x1 > x2 && y1 > y2) { cx = x1; cy = y2; startAng = Math.PI / 2; endAng = Math.PI; }
+        else { cx = x2; cy = y1; startAng = Math.PI; endAng = 3 * Math.PI / 2; }
+    } else {
+        if (x1 < x2 && y1 < y2) { cx = x2; cy = y1; startAng = Math.PI; endAng = Math.PI / 2; }
+        else if (x1 > x2 && y1 < y2) { cx = x1; cy = y2; startAng = -Math.PI / 2; endAng = -Math.PI; }
+        else if (x1 > x2 && y1 > y2) { cx = x2; cy = y1; startAng = 0; endAng = -Math.PI / 2; }
+        else { cx = x1; cy = y2; startAng = Math.PI / 2; endAng = 0; }
+    }
+
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+        const a = startAng + (endAng - startAng) * (i / steps);
+        pts.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]);
+    }
+    return pts;
+}
+
+/**
  * Build a rectangle polygon as a ring of [x,y] pairs (clockwise).
  */
 export function rectRing(x, y, w, h) {
@@ -242,30 +272,7 @@ export function collectShapes(glyph, config, opts = {}) {
             const [_, x1, y1, rx, ry, rot, laf, swf, x2, y2] = m.map(Number);
 
             // Generate points along the arc for the body
-            const pts = [];
-            const steps = 12;
-
-            // To find the center of a quadrant arc:
-            // For swf=1 (CW) and 90 deg, the center is either (x1, y2) or (x2, y1).
-            // We'll use a simpler approach: Sample the ellipse.
-            // This is complex math for a generic arc, but for our grid quadrants:
-            let cx, cy, startAng, endAng;
-            if (swf === 1) {
-                if (x1 < x2 && y1 < y2) { cx = x1; cy = y2; startAng = -Math.PI / 2; endAng = 0; }
-                else if (x1 > x2 && y1 < y2) { cx = x2; cy = y1; startAng = 0; endAng = Math.PI / 2; }
-                else if (x1 > x2 && y1 > y2) { cx = x1; cy = y2; startAng = Math.PI / 2; endAng = Math.PI; }
-                else { cx = x2; cy = y1; startAng = Math.PI; endAng = 3 * Math.PI / 2; }
-            } else {
-                if (x1 < x2 && y1 < y2) { cx = x2; cy = y1; startAng = Math.PI; endAng = Math.PI / 2; }
-                else if (x1 > x2 && y1 < y2) { cx = x1; cy = y2; startAng = -Math.PI / 2; endAng = -Math.PI; }
-                else if (x1 > x2 && y1 > y2) { cx = x2; cy = y1; startAng = 0; endAng = -Math.PI / 2; }
-                else { cx = x1; cy = y2; startAng = Math.PI / 2; endAng = 0; }
-            }
-
-            for (let i = 0; i <= steps; i++) {
-                const a = startAng + (endAng - startAng) * (i / steps);
-                pts.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]);
-            }
+            const pts = sampleArc(x1, y1, rx, ry, swf, x2, y2, 12);
 
             const n1 = `${x1.toFixed(1)},${y1.toFixed(1)}`;
             const n2 = `${x2.toFixed(1)},${y2.toFixed(1)}`;

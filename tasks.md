@@ -85,7 +85,7 @@ design decision before coding starts.
   outage or offline use breaks the app entirely. Download both into
   `js/vendor/` and update the `<script>` tag / import map to reference them
   locally; check licenses allow vendoring (both are MIT, should be fine).
-- [ ] **Add geometry regression tests** for `collectShapes`/`strokeRing` in
+- [x] **Add geometry regression tests** for `collectShapes`/`strokeRing` in
   `js/geometry.js` — e.g. assert every curvature quadrant arc's sampled
   points stay within its cell's bounding box. This is exactly the class of
   bug that shipped twice already (the br-arc hit zone and the swf=0 angle
