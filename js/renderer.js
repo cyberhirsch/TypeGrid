@@ -2,7 +2,7 @@
  * Rendering: drawInto, drawGuides, drawFills, drawStrokes, drawLineHitZones
  */
 import { mk, mkLine, mkHit, mkArcHit, mkPoly, mkPath } from './primitives.js';
-import { strokeRing, mkStrokeId } from './geometry.js';
+import { gridStrokeIds, strokeGeom, arcPathD } from './strokeId.js';
 
 export function drawInto(app, svg, ch, W, H, interactive, showGuides) {
     const { config } = app;
@@ -32,7 +32,7 @@ export function drawInto(app, svg, ch, W, H, interactive, showGuides) {
         drawGuides(app, drawTarget, cw, rh, W, H, interactive ? '#333' : '#1a1a1a');
 
     if (interactive) {
-        if (config.activeTool === 'line') drawLineHitZones(app, drawTarget, cw, rh, W, H);
+        if (config.activeTool === 'line') drawLineHitZones(app, drawTarget);
     }
 }
 
@@ -176,33 +176,19 @@ function drawStrokes(app, svg, ch) {
         const allStrokes = [...strokes, ...previewStrokes];
         const ID_TO_PREVIEW = new Set(previewStrokes);
 
-        // 1. Build Adjacency Graph
+        // 1. Build Adjacency Graph — geometry comes from the grid config, so an
+        //    id means the same edge regardless of how the glyph was saved.
         const graph = new Map();
         allStrokes.forEach(id => {
-            let edge;
-            if (id.startsWith('s:')) {
-                const parts = id.substring(2).split(',').map(v => Number(v));
-                const p1 = [parts[0], parts[1]], p2 = [parts[2], parts[3]];
-                const n1 = `${p1[0].toFixed(1)},${p1[1].toFixed(1)}`;
-                const n2 = `${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
-                edge = { id, type: 'line', n1, n2, p1, p2 };
-            } else if (id.startsWith('a:')) {
-                const d = id.substring(2);
-                const m = d.match(/M\s*([\d.-]+)\s+([\d.-]+)\s+A\s*([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([01])\s+([01])\s+([\d.-]+)\s+([\d.-]+)/);
-                if (m) {
-                    const [_, x1, y1, rx, ry, rot, laf, swf, x2, y2] = m.map(Number);
-                    const p1 = [x1, y1], p2 = [x2, y2];
-                    const n1 = `${p1[0].toFixed(1)},${p1[1].toFixed(1)}`;
-                    const n2 = `${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
-                    edge = { id, type: 'arc', n1, n2, p1, p2, rx, ry, rot, laf, swf };
-                }
-            }
-            if (edge) {
-                if (!graph.has(edge.n1)) graph.set(edge.n1, []);
-                if (!graph.has(edge.n2)) graph.set(edge.n2, []);
-                graph.get(edge.n1).push(edge);
-                graph.get(edge.n2).push(edge);
-            }
+            const g = strokeGeom(id, config);
+            if (!g) return;
+            const n1 = `${g.p1[0].toFixed(1)},${g.p1[1].toFixed(1)}`;
+            const n2 = `${g.p2[0].toFixed(1)},${g.p2[1].toFixed(1)}`;
+            const edge = { ...g, id, n1, n2 };
+            if (!graph.has(n1)) graph.set(n1, []);
+            if (!graph.has(n2)) graph.set(n2, []);
+            graph.get(n1).push(edge);
+            graph.get(n2).push(edge);
         });
 
         // 2. Extract Paths (Chains)
@@ -326,71 +312,19 @@ function drawStrokes(app, svg, ch) {
     }
 }
 
-function drawLineHitZones(app, svg, cw, rh, W, H) {
+function drawLineHitZones(app, svg) {
     const { config, state } = app;
-    const canClick = config.activeTool === 'line';
-    if (!canClick) return;
+    if (config.activeTool !== 'line') return;
 
-    // We still draw invisible hit zones for every grid segment to make selection easy
-    const glyph = app.glyph(state.activeChar);
-    const existing = new Set(glyph.strokes);
+    // One invisible hit zone per addressable stroke id. `gridStrokeIds` is the
+    // single source of truth for what exists on this grid, so anything a
+    // transform produces is guaranteed to be selectable here.
+    const existing = new Set(app.glyph(state.activeChar).strokes);
 
-    // This part depends on the grid type
-    const drawZone = (x1, y1, x2, y2, id) => {
-        const active = existing.has(id);
-        mkHit(svg, x1, y1, x2, y2, id, active);
-    };
-
-    if (config.gridType !== 'hexagonal') {
-        for (let i = 0; i <= config.cols; i++) {
-            for (let j = 0; j <= config.rows; j++) {
-                const x = i * cw, y = j * rh;
-                if (i < config.cols) drawZone(x, y, x + cw, y, mkStrokeId(x, y, x + cw, y));
-                if (j < config.rows) drawZone(x, y, x, y + rh, mkStrokeId(x, y, x, y + rh));
-
-                if (config.gridType === 'triangle' && i < config.cols && j < config.rows) {
-                    drawZone(x, y, x + cw, y + rh, mkStrokeId(x, y, x + cw, y + rh));
-                    drawZone(x + cw, y, x, y + rh, mkStrokeId(x + cw, y, x, y + rh));
-                }
-            }
-        }
-
-        if (config.gridType === 'curvature') {
-            const sx = cw, sy = rh;
-            for (let i = 0; i < config.cols; i++) {
-                for (let j = 0; j < config.rows; j++) {
-                    const x = i * cw, y = j * rh;
-                    // TL, TR, BL, BR center quadrant arcs (elliptical to fit aspect ratio)
-                    const arcs = [
-                        `M ${x + sx} ${y} A ${sx} ${sy} 0 0 1 ${x} ${y + sy}`,
-                        `M ${x} ${y} A ${sx} ${sy} 0 0 0 ${x + sx} ${y + sy}`,
-                        `M ${x} ${y} A ${sx} ${sy} 0 0 1 ${x + sx} ${y + sy}`,
-                        `M ${x + sx} ${y} A ${sx} ${sy} 0 0 0 ${x} ${y + sy}`
-                    ];
-                    arcs.forEach(d => mkArcHit(svg, d, existing.has(`a:${d}`)));
-                }
-            }
-        }
-    } else if (config.gridType === 'hexagonal') {
-        for (let j = 0; j <= config.rows; j++) {
-            const dx = (j % 2) * 0.5 * cw;
-            const dn = ((j + 1) % 2) * 0.5 * cw;
-            const y = j * rh;
-            const yBelow = (j + 1) * rh;
-
-            for (let i = 0; i <= config.cols; i++) {
-                const x = i * cw + dx;
-                if (i < config.cols) drawZone(x, y, (i + 1) * cw + dx, y, mkStrokeId(x, y, (i + 1) * cw + dx, y));
-                if (j < config.rows) {
-                    const targetL = (i - (j % 2 ? 0 : 1)) * cw + dn;
-                    const targetR = (i + (j % 2 ? 1 : 0)) * cw + dn;
-                    if (targetL >= -cw && targetL <= config.cols * cw + cw) drawZone(x, y, targetL, yBelow, mkStrokeId(x, y, targetL, yBelow));
-                    if (targetR >= -cw && targetR <= config.cols * cw + cw) drawZone(x, y, targetR, yBelow, mkStrokeId(x, y, targetR, yBelow));
-                }
-            }
-        }
-        // Last row horizontal hits
-        const lastY = config.rows * rh, lastDx = (config.rows % 2) * 0.5 * cw;
-        for (let i = 0; i < config.cols; i++) drawZone(i * cw + lastDx, lastY, (i + 1) * cw + lastDx, lastY, mkStrokeId(i * cw + lastDx, lastY, (i + 1) * cw + lastDx, lastY));
+    for (const id of gridStrokeIds(config)) {
+        const g = strokeGeom(id, config);
+        if (!g) continue;
+        if (g.type === 'arc') mkArcHit(svg, arcPathD(g), id, existing.has(id));
+        else mkHit(svg, g.p1[0], g.p1[1], g.p2[0], g.p2[1], id, existing.has(id));
     }
 }

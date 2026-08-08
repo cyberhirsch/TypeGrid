@@ -3,14 +3,9 @@
  * Used by both export.js (for clean font outlines) and topology.js (for preview).
  */
 import polygonClipping from 'polygon-clipping';
+import { strokeGeom } from './strokeId.js';
 
 const ARC_STEPS = 32; // segments per semicircle cap
-
-export const quantize = v => Math.round(v * 10) / 10;
-
-export function mkStrokeId(x1, y1, x2, y2) {
-    return `s:${[x1, y1, x2, y2].map(v => quantize(Number(v)).toFixed(1)).join(',')}`;
-}
 
 /**
  * Sample points along a quadrant arc from (x1,y1) to (x2,y2) with radii (rx,ry)
@@ -138,9 +133,6 @@ export function collectShapes(glyph, config, opts = {}) {
     const r = config.strokeWeight / 2;
     const shapes = [];
 
-    // Define quantize locally to ensure consistent coordinate precision for node matching
-    const quantize = v => Math.round(v * 10) / 10;
-
     const tx = (x, y) => {
         const sx = x * scale, sy = y * scale;
         return flipY != null ? [sx, flipY - sy] : [sx, sy];
@@ -215,91 +207,43 @@ export function collectShapes(glyph, config, opts = {}) {
     // 0. Shared Quantize for vertices
     const qV = pt => [Math.round(pt[0] * 100) / 100, Math.round(pt[1] * 100) / 100];
 
-    // 1. Analyze Connectivity and Group into Paths
-    const graph = new Map();
-    const allIds = new Set(glyph.strokes);
+    // 1. Resolve every stroke id to concrete geometry and count how many strokes
+    //    meet at each endpoint. Lines and arcs go into the same graph, so an arc
+    //    meeting a line is correctly treated as a joint rather than two terminals.
+    const nodeKey = ([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`;
+    const degree = new Map();
+    const resolved = [];
 
-    // Group segments into Paths to build cleaner polygons
     glyph.strokes.forEach(id => {
-        let n1, n2, pts;
-        if (id.startsWith('s:')) {
-            const coords = id.substring(2).split(',').map(v => Number(v));
-            n1 = `${coords[0].toFixed(1)},${coords[1].toFixed(1)}`;
-            n2 = `${coords[2].toFixed(1)},${coords[3].toFixed(1)}`;
-            pts = coords;
-        } else if (id.startsWith('a:')) {
-            // Arcs are handled separately or as paths later
-            return;
-        }
-        if (n1 && n2) {
-            const edge = { id, n1, n2, pts };
-            if (!graph.has(n1)) graph.set(n1, []);
-            if (!graph.has(n2)) graph.set(n2, []);
-            graph.get(n1).push(edge);
-            graph.get(n2).push(edge);
+        const g = strokeGeom(id, config);
+        if (!g) return;
+        resolved.push(g);
+        for (const pt of [g.p1, g.p2]) {
+            const k = nodeKey(pt);
+            degree.set(k, (degree.get(k) || 0) + 1);
         }
     });
 
-    // 2. Build stadium shapes for each segment
-    glyph.strokes.forEach(id => {
-        if (id.startsWith('s:')) {
-            const coords = id.substring(2).split(',').map(v => Number(v));
-            const n1 = `${coords[0].toFixed(1)},${coords[1].toFixed(1)}`;
-            const n2 = `${coords[2].toFixed(1)},${coords[3].toFixed(1)}`;
+    // 2. Build stadium shapes. A stroke is a chain of straight pieces (one for a
+    //    line, several for a sampled arc); each piece contributes a capless body
+    //    plus a round joint, and only true terminals get the configured cap.
+    const cap = config.strokeCap || 'round';
+    const isTerminal = pt => (degree.get(nodeKey(pt)) || 0) <= 1;
+    const pushRing = (a, b, capStyle, startCap, endCap) =>
+        shapes.push(strokeRing(a[0], a[1], b[0], b[1], r, capStyle, startCap, endCap).map(p => tx(...p)).map(qV));
 
-            const isN1Terminal = (graph.get(n1) || []).length <= 1;
-            const isN2Terminal = (graph.get(n2) || []).length <= 1;
-            const cap = config.strokeCap || 'round';
+    resolved.forEach(g => {
+        const pts = g.type === 'arc'
+            ? sampleArc(g.p1[0], g.p1[1], g.rx, g.ry, g.swf, g.p2[0], g.p2[1], 12)
+            : [g.p1, g.p2];
+        const startCapStyle = isTerminal(g.p1) ? cap : 'round';
+        const endCapStyle = isTerminal(g.p2) ? cap : 'round';
 
-            // Body
-            shapes.push(strokeRing(coords[0], coords[1], coords[2], coords[3], r, 'round', false, false).map(p => tx(...p)).map(qV));
-
-            // Junction/Terminal
-            if (isN1Terminal) shapes.push(strokeRing(coords[0], coords[1], coords[2], coords[3], r, cap, true, false).map(p => tx(...p)).map(qV));
-            else shapes.push(strokeRing(coords[0], coords[1], coords[2], coords[3], r, 'round', true, false).map(p => tx(...p)).map(qV));
-
-            if (isN2Terminal) shapes.push(strokeRing(coords[0], coords[1], coords[2], coords[3], r, cap, false, true).map(p => tx(...p)).map(qV));
-            else shapes.push(strokeRing(coords[0], coords[1], coords[2], coords[3], r, 'round', false, true).map(p => tx(...p)).map(qV));
-        }
-    });
-
-    // Arcs
-    glyph.strokes.forEach(id => {
-        if (id.startsWith('a:')) {
-            const d = id.substring(2);
-            const m = d.match(/M\s*([\d.-]+)\s+([\d.-]+)\s+A\s*([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([01])\s+([01])\s+([\d.-]+)\s+([\d.-]+)/);
-            if (!m) return;
-            const [_, x1, y1, rx, ry, rot, laf, swf, x2, y2] = m.map(Number);
-
-            // Generate points along the arc for the body
-            const pts = sampleArc(x1, y1, rx, ry, swf, x2, y2, 12);
-
-            const n1 = `${x1.toFixed(1)},${y1.toFixed(1)}`;
-            const n2 = `${x2.toFixed(1)},${y2.toFixed(1)}`;
-            const isN1Terminal = (graph.get(n1) || []).length <= 1;
-            const isN2Terminal = (graph.get(n2) || []).length <= 1;
-            const cap = config.strokeCap || 'round';
-
-            // Create segment bodies between sampled points
-            for (let i = 0; i < pts.length - 1; i++) {
-                // Main body piece
-                shapes.push(strokeRing(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], r, 'round', false, false).map(p => tx(...p)).map(qV));
-
-                // Add round joins at all internal sampling points to ensure a solid fused tube
-                if (i > 0) {
-                    shapes.push(strokeRing(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], r, 'round', true, false).map(p => tx(...p)).map(qV));
-                }
-            }
-
-            // Terminal/Junction caps at the ends of the whole arc
-            const s1 = pts[0], s2 = pts[1];
-            const e1 = pts[pts.length - 2], e2 = pts[pts.length - 1];
-
-            if (isN1Terminal) shapes.push(strokeRing(s1[0], s1[1], s2[0], s2[1], r, cap, true, false).map(p => tx(...p)).map(qV));
-            else shapes.push(strokeRing(s1[0], s1[1], s2[0], s2[1], r, 'round', true, false).map(p => tx(...p)).map(qV));
-
-            if (isN2Terminal) shapes.push(strokeRing(e1[0], e1[1], e2[0], e2[1], r, cap, false, true).map(p => tx(...p)).map(qV));
-            else shapes.push(strokeRing(e1[0], e1[1], e2[0], e2[1], r, 'round', false, true).map(p => tx(...p)).map(qV));
+        for (let i = 0; i < pts.length - 1; i++) {
+            const a = pts[i], b = pts[i + 1];
+            pushRing(a, b, 'round', false, false);                                   // body
+            pushRing(a, b, i === 0 ? startCapStyle : 'round', true, false);          // leading joint
+            if (i === pts.length - 2) pushRing(a, b, endCapStyle, false, true);      // trailing end
         }
     });
 

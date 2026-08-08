@@ -6,7 +6,7 @@ import { drawInto, drawGuidesOnly } from './js/renderer.js';
 import { drawTopoOverlay } from './js/topology.js';
 import { downloadSVG, exportFont } from './js/export.js';
 import { generateCharSets, saveToStorage, loadFromStorage, saveToFile, loadFromFile } from './js/storage.js';
-import { mkStrokeId, quantize } from './js/geometry.js';
+import { flipStrokeId, nudgeStrokeId, strokeNodes, isStrokeId, migrateGlyphs } from './js/strokeId.js';
 
 class Typegrid {
     constructor() {
@@ -126,8 +126,8 @@ class Typegrid {
         this.saveBtn.onclick = () => saveToFile(this.config, this.state.glyphs);
         this.loadBtn.onclick = () => {
             loadFromFile(saved => {
+                this.state.glyphs = this.adoptGlyphs(saved.glyphs, saved.config || this.config);
                 this.config = { ...this.config, ...saved.config };
-                this.state.glyphs = saved.glyphs;
                 this.syncUI();
                 this.refresh();
             });
@@ -212,7 +212,7 @@ class Typegrid {
                 drawMode = g.fills.has(id) ? 'erase' : 'draw';
                 if (drawMode === 'draw') g.fills.add(id); else g.fills.delete(id);
                 lastFillId = id;
-            } else if (id.startsWith('s:') || id.startsWith('a:')) {
+            } else if (isStrokeId(id)) {
                 drawMode = g.strokes.has(id) ? 'erase' : 'draw';
                 startEdgeId = id;
                 this.state.previewMode = drawMode;
@@ -232,7 +232,7 @@ class Typegrid {
                 if (drawMode === 'draw') g.fills.add(id); else g.fills.delete(id);
                 lastFillId = id;
                 this.render();
-            } else if ((id.startsWith('s:') || id.startsWith('a:')) && startEdgeId) {
+            } else if (isStrokeId(id) && startEdgeId) {
                 if (id !== startEdgeId) {
                     const path = this.findPath(startEdgeId, id);
                     this.state.previewPath = path ? path : [startEdgeId, id];
@@ -297,19 +297,12 @@ class Typegrid {
     }
 
     getEdgeNodes(id) {
-        if (id.startsWith('s:')) {
-            const [x1, y1, x2, y2] = id.substring(2).split(',').map(Number);
-            return [`${quantize(x1).toFixed(1)},${quantize(y1).toFixed(1)}`, `${quantize(x2).toFixed(1)},${quantize(y2).toFixed(1)}`];
-        } else if (id.startsWith('a:')) {
-            const parts = id.match(/M\s*([\d.-]+)\s+([\d.-]+)\s+A.*?\s+([\d.-]+)\s+([\d.-]+)$/);
-            if (parts) return [`${quantize(Number(parts[1])).toFixed(1)},${quantize(Number(parts[2])).toFixed(1)}`, `${quantize(Number(parts[3])).toFixed(1)},${quantize(Number(parts[4])).toFixed(1)}`];
-        }
-        return null;
+        return strokeNodes(id, this.config);
     }
 
     getGraph() {
         if (this._cachedGraph) return this._cachedGraph;
-        const edges = document.querySelectorAll('#editorCanvas [data-id^="s:"], #editorCanvas [data-id^="a:"]');
+        const edges = document.querySelectorAll('#editorCanvas [data-id^="s-"]');
         const graph = new Map();
 
         edges.forEach(el => {
@@ -363,12 +356,26 @@ class Typegrid {
     }
 
     /* ── PERSISTENCE ─────────────────────────────────────────────────────── */
+
+    /**
+     * Convert a loaded project's strokes to topological ids. Projects saved
+     * before that change store pixel coordinates, which only mean the right edge
+     * when read against the grid they were saved with — so migrate using the
+     * incoming config, before merging it into the live one.
+     */
+    adoptGlyphs(glyphs, cfg) {
+        const res = migrateGlyphs(glyphs, cfg);
+        if (res.converted) console.info(`Typegrid: migrated ${res.converted} stroke(s) to topological ids.`);
+        if (res.dropped) console.warn(`Typegrid: ${res.dropped} stroke(s) did not sit on the saved grid and were dropped.`);
+        return res.glyphs;
+    }
+
     async loadInitialData() {
         // Try localStorage first
         const saved = loadFromStorage();
         if (saved) {
+            this.state.glyphs = this.adoptGlyphs(saved.glyphs, saved.config || this.config);
             this.config = { ...this.config, ...saved.config };
-            this.state.glyphs = saved.glyphs;
             this.syncUI();
             return;
         }
@@ -377,12 +384,9 @@ class Typegrid {
             const res = await fetch('./vectoroid.tgf');
             if (!res.ok) throw new Error('not found');
             const data = await res.json();
-            const glyphs = {};
-            Object.entries(data.glyphs || {}).forEach(([k, v]) => {
-                glyphs[k] = { fills: new Set(v.fills || []), strokes: new Set(v.strokes || []) };
-            });
-            this.config = { ...this.config, ...(data.config || {}) };
-            this.state.glyphs = glyphs;
+            const cfg = { ...this.config, ...(data.config || {}) };
+            this.state.glyphs = this.adoptGlyphs(data.glyphs || {}, cfg);
+            this.config = cfg;
             this.syncUI();
         } catch (e) {
             console.warn('Could not load default font, starting fresh.', e);
@@ -392,8 +396,8 @@ class Typegrid {
     loadFromStorage() {
         const saved = loadFromStorage();
         if (!saved) return;
+        this.state.glyphs = this.adoptGlyphs(saved.glyphs, saved.config || this.config);
         this.config = { ...this.config, ...saved.config };
-        this.state.glyphs = saved.glyphs;
         this.syncUI();
     }
 
@@ -428,7 +432,6 @@ class Typegrid {
 
     flipGlyph(axis) {
         const g = this.glyph();
-        const H = 600, W = H * this.config.aspectRatio;
         const { cols, rows } = this.config;
         const newFills = new Set();
         const newStrokes = new Set();
@@ -464,19 +467,8 @@ class Typegrid {
         });
 
         g.strokes.forEach(id => {
-            if (id.startsWith('s:')) {
-                const [x1, y1, x2, y2] = id.substring(2).split(',').map(Number);
-                if (axis === 'H') newStrokes.add(mkStrokeId(W - x1, y1, W - x2, y2));
-                else newStrokes.add(mkStrokeId(x1, H - y1, x2, H - y2));
-            } else if (id.startsWith('a:')) {
-                const m = id.match(/M([\d.-]+)\s+([\d.-]+)\s+A([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)/);
-                if (m) {
-                    let [_, m1, m2, rx, ry, rot, laf, swf, x, y] = m.map(Number);
-                    if (axis === 'H') { m1 = W - m1; x = W - x; swf = 1 - swf; }
-                    else { m2 = H - m2; y = H - y; swf = 1 - swf; }
-                    newStrokes.add(`a:M${m1.toFixed(1)} ${m2.toFixed(1)} A${rx.toFixed(1)} ${ry.toFixed(1)} ${rot} ${laf} ${swf} ${x.toFixed(1)} ${y.toFixed(1)}`);
-                }
-            } else { newStrokes.add(id); }
+            const flipped = flipStrokeId(id, axis, this.config);
+            if (flipped) newStrokes.add(flipped);
         });
 
         g.fills = newFills;
@@ -485,9 +477,7 @@ class Typegrid {
 
     nudgeGlyph(dx, dy) {
         const g = this.glyph();
-        const H = 600, W = H * this.config.aspectRatio;
         const { cols, rows } = this.config;
-        const cw = W / cols, rh = H / rows;
         const newFills = new Set();
         const newStrokes = new Set();
 
@@ -506,18 +496,8 @@ class Typegrid {
         });
 
         g.strokes.forEach(id => {
-            if (id.startsWith('s:')) {
-                const [x1, y1, x2, y2] = id.substring(2).split(',').map(Number);
-                newStrokes.add(`s:${(x1 + dx * cw).toFixed(1)},${(y1 + dy * rh).toFixed(1)},${(x2 + dx * cw).toFixed(1)},${(y2 + dy * rh).toFixed(1)}`);
-            } else if (id.startsWith('a:')) {
-                const m = id.match(/M([\d.-]+)\s+([\d.-]+)\s+A([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)/);
-                if (m) {
-                    let [_, m1, m2, rx, ry, rot, laf, swf, x, y] = m.map(Number);
-                    m1 += dx * cw; m2 += dy * rh;
-                    x += dx * cw; y += dy * rh;
-                    newStrokes.add(`a:M${m1.toFixed(1)} ${m2.toFixed(1)} A${rx.toFixed(1)} ${ry.toFixed(1)} ${rot} ${laf} ${swf} ${x.toFixed(1)} ${y.toFixed(1)}`);
-                }
-            } else { newStrokes.add(id); }
+            const moved = nudgeStrokeId(id, dx, dy, this.config);
+            if (moved) newStrokes.add(moved);
         });
 
         g.fills = newFills;

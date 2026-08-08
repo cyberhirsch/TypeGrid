@@ -32,13 +32,13 @@ export function mkHit(svg, x1, y1, x2, y2, id, active, onclick) {
     if (onclick) l.onclick = onclick;
 }
 
-export function mkArcHit(svg, d, active) {
+export function mkArcHit(svg, d, id, active) {
     const p = mk(svg, 'path');
     p.setAttribute('d', d);
     p.setAttribute('fill', 'none');
     p.setAttribute('stroke', active ? 'rgba(68,255,68,0.3)' : 'rgba(255,255,255,0.01)');
     p.setAttribute('stroke-width', '12');
-    p.setAttribute('data-id', `a:${d}`);
+    p.setAttribute('data-id', id);
     p.style.cursor = 'crosshair';
 }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { collectShapes, strokeRing, mkStrokeId, quantize, sampleArc } from './geometry.js';
+import { collectShapes, strokeRing, sampleArc } from './geometry.js';
+import { mkLineId, mkArcId } from './strokeId.js';
 
 /**
  * Regression tests for the arc/stroke geometry bugs that shipped twice
@@ -76,10 +77,10 @@ describe('collectShapes — curvature quadrant arcs stay within their cell', () 
     const r = CONFIG.strokeWeight / 2;
 
     const arcCases = {
-        'tr-bl sweep=1': `a:M ${x + sx} ${y} A ${sx} ${sy} 0 0 1 ${x} ${y + sy}`,
-        'tl-br sweep=0': `a:M ${x} ${y} A ${sx} ${sy} 0 0 0 ${x + sx} ${y + sy}`,
-        'tl-br sweep=1': `a:M ${x} ${y} A ${sx} ${sy} 0 0 1 ${x + sx} ${y + sy}`,
-        'tr-bl sweep=0': `a:M ${x + sx} ${y} A ${sx} ${sy} 0 0 0 ${x} ${y + sy}`,
+        'centred tl': mkArcId(0, 0, 'tl'),
+        'centred tr': mkArcId(0, 0, 'tr'),
+        'centred bl': mkArcId(0, 0, 'bl'),
+        'centred br': mkArcId(0, 0, 'br'),
     };
 
     for (const [label, arcId] of Object.entries(arcCases)) {
@@ -101,7 +102,7 @@ describe('collectShapes — curvature quadrant arcs stay within their cell', () 
 describe('collectShapes — straight strokes stay within their segment bounding box', () => {
     it('a horizontal stroke stays within its span plus stroke radius', () => {
         const r = CONFIG.strokeWeight / 2;
-        const id = mkStrokeId(0, 150, 150, 150);
+        const id = mkLineId('h', 0, 1); // spans x 0→150 at y=150
         const glyph = emptyGlyph([id]);
         const shapes = collectShapes(glyph, CONFIG);
         expect(shapes.length).toBeGreaterThan(0);
@@ -143,10 +144,19 @@ describe('strokeRing', () => {
     });
 });
 
-describe('quantize', () => {
-    it('rounds to one decimal place', () => {
-        expect(quantize(1.23)).toBe(1.2);
-        expect(quantize(1.25)).toBe(1.3);
-        expect(quantize(1.0)).toBe(1.0);
+describe('collectShapes — grid type drives arc geometry', () => {
+    it('resolves the same arc id differently as the grid is resized', () => {
+        // The point of topological ids: the id is stable, the geometry follows
+        // the current grid rather than being frozen at draw time.
+        const glyph = emptyGlyph([mkArcId(1, 1, 'tl')]);
+        const wide = collectShapes(glyph, { ...CONFIG, cols: 2 });
+        const narrow = collectShapes(glyph, { ...CONFIG, cols: 8 });
+        const maxX = rings => Math.max(...rings.flat().map(([px]) => px));
+        expect(maxX(wide)).toBeGreaterThan(maxX(narrow));
+    });
+
+    it('ignores legacy pixel ids that survived without migration', () => {
+        const glyph = emptyGlyph(['s:0,150,150,150']);
+        expect(collectShapes(glyph, CONFIG)).toEqual([]);
     });
 });
