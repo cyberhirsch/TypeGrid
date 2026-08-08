@@ -257,9 +257,9 @@ export function collectShapes(glyph, config, opts = {}) {
                 else { cx = x2; cy = y1; startAng = Math.PI; endAng = 3 * Math.PI / 2; }
             } else {
                 if (x1 < x2 && y1 < y2) { cx = x2; cy = y1; startAng = Math.PI; endAng = Math.PI / 2; }
-                else if (x1 > x2 && y1 < y2) { cx = x1; cy = y2; startAng = Math.PI / 2; endAng = 0; }
+                else if (x1 > x2 && y1 < y2) { cx = x1; cy = y2; startAng = -Math.PI / 2; endAng = -Math.PI; }
                 else if (x1 > x2 && y1 > y2) { cx = x2; cy = y1; startAng = 0; endAng = -Math.PI / 2; }
-                else { cx = x1; cy = y2; startAng = -Math.PI / 2; endAng = -Math.PI; }
+                else { cx = x1; cy = y2; startAng = Math.PI / 2; endAng = 0; }
             }
 
             for (let i = 0; i <= steps; i++) {

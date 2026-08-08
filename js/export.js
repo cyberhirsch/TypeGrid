@@ -5,35 +5,85 @@
  */
 import { collectShapes, unionShapes } from './geometry.js';
 
-export function downloadSVG(canvas, activeChar, fontName = 'typegrid') {
-    const svgData = new XMLSerializer().serializeToString(canvas);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([svgData], { type: 'image/svg+xml' }));
-    const name = fontName.replace(/\s+/g, '-');
-    a.download = `${name}-${activeChar}.svg`;
-    a.click();
+/** Boolean-union a glyph's shapes into clean outline rings. */
+function unionedRings(glyph, config, opts) {
+    const rings = collectShapes(glyph, config, opts);
+    return rings.length === 0 ? [] : unionShapes(rings);
 }
 
-export function exportPNG(canvas, name, size = 512) {
-    const svgData = new XMLSerializer().serializeToString(canvas);
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
+/** Convert unioned rings to an SVG path `d` string. */
+function ringsToPathData(merged) {
+    let d = '';
+    merged.forEach(polygon => {
+        polygon.forEach(ring => {
+            if (ring.length < 3) return;
+            d += `M ${ring[0][0].toFixed(2)} ${ring[0][1].toFixed(2)}`;
+            for (let i = 1; i < ring.length; i++) d += ` L ${ring[i][0].toFixed(2)} ${ring[i][1].toFixed(2)}`;
+            d += ' Z ';
+        });
+    });
+    return d.trim();
+}
+
+/**
+ * Build a standalone SVG containing only the glyph's merged outlines —
+ * no grid guides, hit zones, or editor overlays. Uses the same padded
+ * framing as the editor canvas so boundary strokes aren't clipped.
+ */
+export function buildCleanSVG(glyph, config, color) {
+    const fill = color || '#fff';
+    const H = 600, W = H * config.aspectRatio;
+    const pad = config.strokeWeight + 2;
+    const width = W + 2 * pad, height = H + 2 * pad;
+
+    const d = ringsToPathData(unionedRings(glyph, config));
+    const body = d ? `<path d="${d}" fill="${fill}" fill-rule="evenodd"/>` : '';
+
+    const markup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-pad} ${-pad} ${width} ${height}" width="${width}" height="${height}">${body}</svg>`;
+    return { markup, width, height };
+}
+
+const safeName = n => String(n).replace(/\s+/g, '-');
+
+export function downloadSVG(glyph, config, baseName = 'typegrid', color) {
+    const { markup } = buildCleanSVG(glyph, config, color);
+    const url = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeName(baseName)}.svg`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function exportPNG(glyph, config, baseName = 'icongrid', size = 512, color) {
+    const { markup, width, height } = buildCleanSVG(glyph, config, color);
+    const url = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml;charset=utf-8' }));
 
     const img = new Image();
     img.onload = () => {
+        // Fit the longest edge to `size`, preserving aspect ratio
+        const scale = size / Math.max(width, height);
+        const w = Math.max(1, Math.round(width * scale));
+        const h = Math.max(1, Math.round(height * scale));
+
         const raster = document.createElement('canvas');
-        raster.width = size;
-        raster.height = size;
-        const ctx = raster.getContext('2d');
-        ctx.drawImage(img, 0, 0, size, size);
+        raster.width = w;
+        raster.height = h;
+        raster.getContext('2d').drawImage(img, 0, 0, w, h);
         URL.revokeObjectURL(url);
 
         raster.toBlob(blob => {
+            const objUrl = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `${name}-${size}.png`;
+            a.href = objUrl;
+            a.download = `${safeName(baseName)}-${size}.png`;
             a.click();
+            setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
         });
+    };
+    img.onerror = () => {
+        URL.revokeObjectURL(url);
+        console.warn('PNG export: failed to rasterize SVG');
     };
     img.src = url;
 }
@@ -93,12 +143,9 @@ function buildUnionedPath(glyph, config) {
     const s = upm / H;
 
     // Collect shapes already in font coordinate space (scaled + Y-flipped)
-    const rings = collectShapes(glyph, config, { scale: s, flipY: upm });
+    const merged = unionedRings(glyph, config, { scale: s, flipY: upm });
 
-    if (rings.length === 0) return path;
-
-    // Perform boolean union
-    const merged = unionShapes(rings);
+    if (merged.length === 0) return path;
 
     // Convert merged multi-polygon to opentype path commands
     merged.forEach(polygon => {

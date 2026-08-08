@@ -364,7 +364,7 @@ function drawLineHitZones(app, svg, cw, rh, W, H) {
                         `M ${x + sx} ${y} A ${sx} ${sy} 0 0 1 ${x} ${y + sy}`,
                         `M ${x} ${y} A ${sx} ${sy} 0 0 0 ${x + sx} ${y + sy}`,
                         `M ${x} ${y} A ${sx} ${sy} 0 0 1 ${x + sx} ${y + sy}`,
-                        `M ${x + sx} ${y + sy} A ${sx} ${sy} 0 0 0 ${x} ${y + sy}`
+                        `M ${x + sx} ${y} A ${sx} ${sy} 0 0 0 ${x} ${y + sy}`
                     ];
                     arcs.forEach(d => mkArcHit(svg, d, existing.has(`a:${d}`)));
                 }

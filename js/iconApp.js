@@ -134,9 +134,11 @@ class IconGrid {
         this.btnFill.onclick = () => this.setTool('fill');
         this.btnLine.onclick = () => this.setTool('line');
 
-        this.downloadSVGBtn.onclick = () => downloadSVG(this.canvas, this.state.activeChar, this.config.brandName);
-        this.exportPNGSmallBtn.onclick = () => exportPNG(this.canvas, `${this.config.brandName}-${this.state.activeChar}`, 64);
-        this.exportPNGLargeBtn.onclick = () => exportPNG(this.canvas, `${this.config.brandName}-${this.state.activeChar}`, 512);
+        const markName = () => `${this.config.brandName}-${this.state.activeChar}`;
+        const markColor = () => this.config.primaryColor || '#ffffff';
+        this.downloadSVGBtn.onclick = () => downloadSVG(this.glyph(), this.config, markName(), markColor());
+        this.exportPNGSmallBtn.onclick = () => exportPNG(this.glyph(), this.config, markName(), 64, markColor());
+        this.exportPNGLargeBtn.onclick = () => exportPNG(this.glyph(), this.config, markName(), 512, markColor());
 
         this.clearSpaceToggle.onclick = () => { this.config.showClearSpace = this.clearSpaceToggle.checked; this.render(); };
 

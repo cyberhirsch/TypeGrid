@@ -152,7 +152,7 @@ class Typegrid {
 
         this.exportBtn.onclick = () => exportFont(this.state, this.config, 'ttf');
         document.getElementById('exportFontOTF').onclick = () => exportFont(this.state, this.config, 'otf');
-        this.downloadSVGBtn.onclick = () => downloadSVG(this.canvas, this.state.activeChar, this.config.fontName);
+        this.downloadSVGBtn.onclick = () => downloadSVG(this.glyph(), this.config, `${this.config.fontName}-${this.state.activeChar}`);
 
         this.meanLineSlider.oninput = e => { this.config.meanLine = +e.target.value; this.meanLineValue.textContent = this.config.meanLine; this.render(); };
         this.baselineSlider.oninput = e => { this.config.baseline = +e.target.value; this.baselineValue.textContent = this.config.baseline; this.render(); };
