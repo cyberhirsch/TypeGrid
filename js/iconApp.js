@@ -1,20 +1,20 @@
 /**
- * ICONGRID – Logo/Icon design tool sharing Typegrid's grid engine.
- * Same interaction model as Typegrid (draw fills/strokes on a shared grid,
- * flip/rotate/nudge, boolean-union export) but the content model is a small
- * user-defined list of named variants (e.g. "Primary", "Monochrome",
- * "Favicon") instead of one glyph per Unicode character.
+ * ICONGRID – Logo/icon editor built on the shared grid editor.
+ * Same drawing model as Typegrid, but the content is a small user-defined list
+ * of named variants (e.g. "Primary", "Monochrome", "Favicon") rather than one
+ * glyph per Unicode character, and it exports SVG/PNG instead of a font.
  */
+import { GridEditor } from './gridEditor.js';
 import { drawInto } from './renderer.js';
 import { downloadSVG, exportPNG } from './export.js';
 import { saveIconToStorage, loadIconFromStorage, saveIconToFile, loadIconFromFile } from './storage.js';
-import { flipStrokeId, nudgeStrokeId, strokeNodes, isStrokeId, migrateGlyphs } from './strokeId.js';
+import { gridDims } from './strokeId.js';
 
 const DEFAULT_VARIANTS = ['Primary', 'Monochrome', 'Favicon'];
 
-class IconGrid {
+class IconGrid extends GridEditor {
     constructor() {
-        this.config = {
+        super({
             rows: 6,
             cols: 6,
             aspectRatio: 1,
@@ -29,17 +29,25 @@ class IconGrid {
             brandName: 'IconGrid',
             primaryColor: '#ffffff',
             description: ''
-        };
-        this.state = {
-            activeChar: 'Primary',
-            glyphs: {}
-        };
+        }, 'Primary');
         this.history = [];
         this.redoStack = [];
         this.pushHistory();
         this.init();
     }
 
+    get label() { return 'IconGrid'; }
+
+    init() {
+        this.cacheDOM();
+        this.bindEvents();
+        this.loadInitialData();
+        this.renderInventory();
+        this.render();
+        this.renderPreview();
+    }
+
+    /* ── HISTORY ─────────────────────────────────────────────────────────── */
     pushHistory() {
         const snapshot = JSON.stringify({
             config: this.config,
@@ -84,16 +92,6 @@ class IconGrid {
         }
         this.syncUI();
         this.refresh();
-    }
-
-    /* ── DOM ─────────────────────────────────────────────────────────────── */
-    async init() {
-        this.cacheDOM();
-        this.bindEvents();
-        this.loadInitialData();
-        this.setupVariants();
-        this.render();
-        this.renderUsagePreview();
     }
 
     /* ── DOM ─────────────────────────────────────────────────────────────── */
@@ -149,6 +147,9 @@ class IconGrid {
 
     /* ── EVENTS ──────────────────────────────────────────────────────────── */
     bindEvents() {
+        this.bindGridControls();
+        this.bindDrawing();
+
         this.saveBtn.onclick = () => saveIconToFile(this.config, this.state.glyphs);
         this.loadBtn.onclick = () => {
             loadIconFromFile(saved => {
@@ -169,21 +170,6 @@ class IconGrid {
             }
         };
 
-        this.rowsSlider.oninput = e => { this.config.rows = +e.target.value; this.rowsValue.textContent = this.config.rows; this.updateSquare(); this.refresh(); };
-        this.colsSlider.oninput = e => { this.config.cols = +e.target.value; this.colsValue.textContent = this.config.cols; this.updateSquare(); this.refresh(); };
-        this.aspectSlider.oninput = e => { this.config.aspectRatio = +e.target.value; this.aspectValue.textContent = this.config.aspectRatio.toFixed(2); this.refresh(); };
-        this.strokeSlider.oninput = e => { this.config.strokeWeight = +e.target.value; this.strokeValue.textContent = this.config.strokeWeight; this.render(); };
-        this.strokeCapSelect.onchange = e => { this.config.strokeCap = e.target.value; this.render(); };
-        this.strokeJoinSelect.onchange = e => { this.config.strokeJoin = e.target.value; this.render(); };
-        this.lockSquareCheck.onclick = () => { this.config.lockSquare = this.lockSquareCheck.checked; this.updateSquare(); this.refresh(); };
-
-        this.gridTypeSelect.onchange = e => { this.config.gridType = e.target.value; this.refresh(); };
-
-        this.clearBtn.onclick = () => { const g = this.glyph(); g.fills.clear(); g.strokes.clear(); this.refresh(); };
-
-        this.btnFill.onclick = () => this.setTool('fill');
-        this.btnLine.onclick = () => this.setTool('line');
-
         const markName = () => `${this.config.brandName}-${this.state.activeChar}`;
         const markColor = () => this.config.primaryColor || '#ffffff';
         this.downloadSVGBtn.onclick = () => downloadSVG(this.glyph(), this.config, markName(), markColor());
@@ -191,15 +177,6 @@ class IconGrid {
         this.exportPNGLargeBtn.onclick = () => exportPNG(this.glyph(), this.config, markName(), 512, markColor());
 
         this.clearSpaceToggle.onclick = () => { this.config.showClearSpace = this.clearSpaceToggle.checked; this.render(); };
-
-        this.flipHBtn.onclick = () => { this.flipGlyph('H'); this.refresh(); };
-        this.flipVBtn.onclick = () => { this.flipGlyph('V'); this.refresh(); };
-        this.rotate180Btn.onclick = () => { this.flipGlyph('H'); this.flipGlyph('V'); this.refresh(); };
-
-        this.nudgeLBtn.onclick = () => { this.nudgeGlyph(-1, 0); this.refresh(); };
-        this.nudgeRBtn.onclick = () => { this.nudgeGlyph(1, 0); this.refresh(); };
-        this.nudgeUBtn.onclick = () => { this.nudgeGlyph(0, -1); this.refresh(); };
-        this.nudgeDBtn.onclick = () => { this.nudgeGlyph(0, 1); this.refresh(); };
 
         this.addVariantBtn.onclick = () => {
             const name = prompt('Variant name (e.g. Monochrome, Favicon):');
@@ -219,185 +196,19 @@ class IconGrid {
             Object.keys(this.metaFields).forEach(k => this.config[k] = this.metaFields[k].value);
             this.metaModal.classList.remove('active');
             this.brandNameInput.value = this.config.brandName || 'IconGrid';
-            saveIconToStorage(this.config, this.state.glyphs);
+            this.persist();
         };
         window.addEventListener('click', e => { if (e.target === this.metaModal) this.metaModal.classList.remove('active'); });
 
         this.brandNameInput.oninput = e => {
             this.config.brandName = e.target.value.trim() || 'IconGrid';
-            saveIconToStorage(this.config, this.state.glyphs);
+            this.persist();
         };
-
-        let isDrawing = false;
-        let drawMode = 'draw';
-        let startEdgeId = null;
-        let lastFillId = null;
-
-        this.canvas.addEventListener('pointerdown', e => {
-            const id = e.target.getAttribute('data-id');
-            if (!id) return;
-            isDrawing = true;
-            e.preventDefault();
-
-            const g = this.glyph();
-            if (id.startsWith('f-')) {
-                drawMode = g.fills.has(id) ? 'erase' : 'draw';
-                if (drawMode === 'draw') g.fills.add(id); else g.fills.delete(id);
-                lastFillId = id;
-            } else if (isStrokeId(id)) {
-                drawMode = g.strokes.has(id) ? 'erase' : 'draw';
-                startEdgeId = id;
-                this.state.previewMode = drawMode;
-                this.state.previewPath = [id];
-            }
-            this.render();
-        });
-
-        this.canvas.addEventListener('pointermove', e => {
-            if (!isDrawing) return;
-            const id = e.target.getAttribute('data-id');
-            if (!id) return;
-
-            const g = this.glyph();
-
-            if (id.startsWith('f-') && id !== lastFillId) {
-                if (drawMode === 'draw') g.fills.add(id); else g.fills.delete(id);
-                lastFillId = id;
-                this.render();
-            } else if (isStrokeId(id) && startEdgeId) {
-                if (id !== startEdgeId) {
-                    const path = this.findPath(startEdgeId, id);
-                    this.state.previewPath = path ? path : [startEdgeId, id];
-                } else {
-                    this.state.previewPath = [startEdgeId];
-                }
-                this.render();
-            }
-        });
-
-        window.addEventListener('pointerup', () => {
-            if (!isDrawing) return;
-
-            if (this.state.previewPath) {
-                const g = this.glyph();
-                this.state.previewPath.forEach(edge => {
-                    if (this.state.previewMode === 'draw') g.strokes.add(edge);
-                    else g.strokes.delete(edge);
-                });
-            }
-            isDrawing = false;
-            startEdgeId = null;
-            lastFillId = null;
-            this.state.previewPath = null;
-            this.refresh();
-        });
-    }
-
-    /* ── STATE HELPERS ───────────────────────────────────────────────────── */
-    refresh() {
-        this.render();
-        this.setupVariants();
-        this.renderUsagePreview();
-        saveIconToStorage(this.config, this.state.glyphs);
-    }
-
-    glyph(c) {
-        c = c || this.state.activeChar;
-        if (!this.state.glyphs[c]) this.state.glyphs[c] = { fills: new Set(), strokes: new Set() };
-        return this.state.glyphs[c];
-    }
-
-    setTool(t) {
-        this.config.activeTool = t;
-        this.btnFill.classList.toggle('active', t === 'fill');
-        this.btnLine.classList.toggle('active', t === 'line');
-        this.strokeControl.style.display = t === 'line' ? 'block' : 'none';
-        this.render();
-    }
-
-    updateSquare() {
-        if (this.config.lockSquare) {
-            this.config.aspectRatio = this.config.cols / this.config.rows;
-            this.aspectValue.textContent = this.config.aspectRatio.toFixed(2);
-            this.aspectSlider.value = this.config.aspectRatio;
-            this.aspectSlider.disabled = true;
-            this.aspectSlider.style.opacity = '0.3';
-        } else {
-            this.aspectSlider.disabled = false;
-            this.aspectSlider.style.opacity = '1';
-        }
-    }
-
-    getEdgeNodes(id) {
-        return strokeNodes(id, this.config);
-    }
-
-    getGraph() {
-        if (this._cachedGraph) return this._cachedGraph;
-        const edges = document.querySelectorAll('#iconCanvas [data-id^="s-"]');
-        const graph = new Map();
-
-        edges.forEach(el => {
-            const id = el.getAttribute('data-id');
-            const nodes = this.getEdgeNodes(id);
-            if (!nodes) return;
-            const [n1, n2] = nodes;
-
-            if (!graph.has(n1)) graph.set(n1, []);
-            if (!graph.has(n2)) graph.set(n2, []);
-
-            graph.get(n1).push({ edgeId: id, toNode: n2 });
-            graph.get(n2).push({ edgeId: id, toNode: n1 });
-        });
-
-        this._cachedGraph = graph;
-        return graph;
-    }
-
-    findPath(startEdgeId, endEdgeId) {
-        if (startEdgeId === endEdgeId) return [startEdgeId];
-        const graph = this.getGraph();
-
-        const startNodes = this.getEdgeNodes(startEdgeId);
-        if (!startNodes) return null;
-
-        const q = [];
-        const visitedNodes = new Set();
-        q.push({ node: startNodes[0], path: [startEdgeId] });
-        q.push({ node: startNodes[1], path: [startEdgeId] });
-        visitedNodes.add(startNodes[0]);
-        visitedNodes.add(startNodes[1]);
-
-        while (q.length > 0) {
-            const curr = q.shift();
-            if (curr.path.length > 50) continue;
-
-            const neighbors = graph.get(curr.node) || [];
-
-            for (const neighbor of neighbors) {
-                if (neighbor.edgeId === endEdgeId) {
-                    return [...curr.path, neighbor.edgeId];
-                }
-                if (!visitedNodes.has(neighbor.toNode)) {
-                    visitedNodes.add(neighbor.toNode);
-                    q.push({ node: neighbor.toNode, path: [...curr.path, neighbor.edgeId] });
-                }
-            }
-        }
-        return null;
     }
 
     /* ── PERSISTENCE ─────────────────────────────────────────────────────── */
-
-    /**
-     * Convert a loaded project's strokes to topological ids, using the config the
-     * project was saved with — legacy pixel ids only resolve against their own grid.
-     */
-    adoptGlyphs(glyphs, cfg) {
-        const res = migrateGlyphs(glyphs, cfg);
-        if (res.converted) console.info(`IconGrid: migrated ${res.converted} stroke(s) to topological ids.`);
-        if (res.dropped) console.warn(`IconGrid: ${res.dropped} stroke(s) did not sit on the saved grid and were dropped.`);
-        return res.glyphs;
+    persist() {
+        saveIconToStorage(this.config, this.state.glyphs);
     }
 
     loadInitialData() {
@@ -416,105 +227,13 @@ class IconGrid {
     }
 
     syncUI() {
-        this.rowsSlider.value = this.config.rows;
-        this.colsSlider.value = this.config.cols;
-        this.aspectSlider.value = this.config.aspectRatio;
-        this.strokeSlider.value = this.config.strokeWeight;
-        this.rowsValue.textContent = this.config.rows;
-        this.colsValue.textContent = this.config.cols;
-        this.aspectValue.textContent = this.config.aspectRatio.toFixed(2);
-        this.strokeCapSelect.value = this.config.strokeCap || 'round';
-        this.strokeJoinSelect.value = this.config.strokeJoin || 'round';
-        this.lockSquareCheck.checked = !!this.config.lockSquare;
         this.clearSpaceToggle.checked = !!this.config.showClearSpace;
-        this.gridTypeSelect.value = this.config.gridType;
         this.brandNameInput.value = this.config.brandName || 'IconGrid';
-        this.updateSquare();
-        this.setTool(this.config.activeTool);
-    }
-
-    flipGlyph(axis) {
-        const g = this.glyph();
-        const H = 600, W = H * this.config.aspectRatio;
-        const { cols, rows } = this.config;
-        const newFills = new Set();
-        const newStrokes = new Set();
-
-        g.fills.forEach(id => {
-            if (id.startsWith('f-r-')) {
-                const parts = id.split('-');
-                const i = +parts[2], j = +parts[3];
-                if (axis === 'H') newFills.add(`f-r-${(cols - 1) - i}-${j}`);
-                else newFills.add(`f-r-${i}-${(rows - 1) - j}`);
-            } else if (id.startsWith('f-t-')) {
-                const parts = id.split('-');
-                const i = +parts[2], j = +parts[3], pos = parts[4];
-                let ni = i, nj = j, npos = pos;
-                if (axis === 'H') { ni = (cols - 1) - i; if (pos === 'r') npos = 'l'; else if (pos === 'l') npos = 'r'; }
-                else { nj = (rows - 1) - j; if (pos === 't') npos = 'b'; else if (pos === 'b') npos = 't'; }
-                newFills.add(`f-t-${ni}-${nj}-${npos}`);
-            } else if (id.startsWith('f-c-')) {
-                const parts = id.split('-');
-                const i = +parts[2], j = +parts[3], pos = parts[4];
-                let ni = i, nj = j, npos = pos;
-                if (axis === 'H') {
-                    ni = (cols - 1) - i;
-                    if (pos === 'bl') npos = 'br'; else if (pos === 'br') npos = 'bl';
-                    else if (pos === 'tl') npos = 'tr'; else if (pos === 'tr') npos = 'tl';
-                } else {
-                    nj = (rows - 1) - j;
-                    if (pos === 'bl') npos = 'tl'; else if (pos === 'tl') npos = 'bl';
-                    else if (pos === 'br') npos = 'tr'; else if (pos === 'tr') npos = 'br';
-                }
-                newFills.add(`f-c-${ni}-${nj}-${npos}`);
-            } else { newFills.add(id); }
-        });
-
-        g.strokes.forEach(id => {
-            const flipped = flipStrokeId(id, axis, this.config);
-            if (flipped) newStrokes.add(flipped);
-        });
-
-        g.fills = newFills;
-        g.strokes = newStrokes;
-    }
-
-    nudgeGlyph(dx, dy) {
-        const g = this.glyph();
-        const H = 600, W = H * this.config.aspectRatio;
-        const { cols, rows } = this.config;
-        const cw = W / cols, rh = H / rows;
-        const newFills = new Set();
-        const newStrokes = new Set();
-
-        g.fills.forEach(id => {
-            const parts = id.split('-');
-            const type = parts[1];
-            const i = +parts[2], j = +parts[3];
-            const ni = i + dx, nj = j + dy;
-
-            if (ni >= 0 && ni < (type === 'h' ? rows : cols) && nj >= 0 && nj < (type === 'h' ? cols : rows)) {
-                const suffix = parts.slice(4).join('-');
-                newFills.add(`f-${type}-${ni}-${nj}${suffix ? '-' + suffix : ''}`);
-            }
-        });
-
-        g.strokes.forEach(id => {
-            const moved = nudgeStrokeId(id, dx, dy, this.config);
-            if (moved) newStrokes.add(moved);
-        });
-
-        g.fills = newFills;
-        g.strokes = newStrokes;
+        this.syncGridControls();
     }
 
     /* ── RENDER ──────────────────────────────────────────────────────────── */
-    render() {
-        this._cachedGraph = null;
-        const H = 600, W = H * this.config.aspectRatio;
-        const pad = this.config.strokeWeight + 2;
-        this.canvas.setAttribute('viewBox', `${-pad} ${-pad} ${W + 2 * pad} ${H + 2 * pad}`);
-        this.canvas.innerHTML = '';
+    drawCanvas(W, H) {
         drawInto(this, this.canvas, this.state.activeChar, W, H, true);
 
         if (this.config.showClearSpace) {
@@ -534,11 +253,11 @@ class IconGrid {
     }
 
     /* ── VARIANT OVERVIEW ────────────────────────────────────────────────── */
-    setupVariants() {
+    renderInventory() {
         this.variantGrid.innerHTML = '';
         const names = Object.keys(this.state.glyphs).length ? Object.keys(this.state.glyphs) : DEFAULT_VARIANTS;
-        const H_ui = 120, W_ui = H_ui * this.config.aspectRatio;
-        const H = 600, W = H * this.config.aspectRatio;
+        const H_ui = 120;
+        const { W, H } = gridDims(this.config);
         const pad = this.config.strokeWeight + 2;
 
         for (const name of names) {
@@ -560,7 +279,10 @@ class IconGrid {
             item.appendChild(svg);
             item.appendChild(lbl);
 
-            item.onclick = (e) => {
+            // Rename on double-click. This has to be detected inside the single
+            // click handler: the first click calls refresh(), which rebuilds this
+            // list and detaches the node before an ondblclick could ever fire.
+            item.onclick = e => {
                 if (e.detail === 2) {
                     const renamed = prompt('Rename variant:', name);
                     if (!renamed || !renamed.trim() || renamed === name) return;
@@ -587,14 +309,13 @@ class IconGrid {
     }
 
     /* ── USAGE PREVIEW ───────────────────────────────────────────────────── */
-    renderUsagePreview() {
+    renderPreview() {
         if (!this.usagePreview) return;
         this.usagePreview.innerHTML = '';
-        const H = 600, W = H * this.config.aspectRatio;
-        const sizes = [64, 32, 16];
+        const { W, H } = gridDims(this.config);
 
-        sizes.forEach(size => {
-            ['dark', 'light'].forEach(theme => {
+        for (const size of [64, 32, 16]) {
+            for (const theme of ['dark', 'light']) {
                 const swatch = document.createElement('div');
                 swatch.className = `usage-swatch ${theme}`;
                 swatch.style.width = `${size}px`;
@@ -605,12 +326,13 @@ class IconGrid {
                 svg.setAttribute('width', size);
                 svg.setAttribute('height', size);
                 svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                // showGuides=false: these swatches should show the mark, not the grid.
                 drawInto(this, svg, this.state.activeChar, W, H, false, false);
 
                 swatch.appendChild(svg);
                 this.usagePreview.appendChild(swatch);
-            });
-        });
+            }
+        }
     }
 }
 
