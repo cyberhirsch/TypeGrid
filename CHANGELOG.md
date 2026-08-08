@@ -1,5 +1,18 @@
 # TypeGrid: Changelog
 
+### [Unreleased] – 2026-08-08
+**"IconGrid Stabilization"** — Phase 1 bug-fix pass on the new IconGrid tool.
+*   **Fixed**: `js/iconApp.js` syntax error that 500'd the dev server and broke IconGrid entirely (orphaned `init()` body left outside any method after an earlier undo/redo edit).
+*   **Fixed**: Variant rename — double-click never fired because the single-click handler rebuilt the list first; now detects double-click via `e.detail === 2` before refreshing.
+*   **Fixed**: Usage-preview swatches showed grid guides instead of a clean mark; added a `showGuides` option to `drawInto()`.
+*   **Fixed**: `primaryColor` only affected export, not the live canvas — relabeled to "Export Color" to remove the mismatch.
+*   **Fixed**: `localStorage.setItem` quota errors (private browsing, full storage) now caught and logged once instead of throwing uncaught and silently killing autosave.
+*   **Fixed**: Loading the wrong project file type (e.g. `.tgf` into IconGrid) now shows a clear error instead of silently producing garbage state.
+*   **Fixed**: Export seam/notch artifacts at stroke joins — `ARC_STEPS` raised 12→32 so independently-drawn round caps approximate a true circle closely enough that shared joints no longer facet.
+*   **Fixed**: Drag performance on large grids — `pointermove` now only re-renders the canvas; the full thumbnail/preview rebuild + autosave is deferred to `pointerup` (was ~1.1s/step at 15×15, now matches the default-grid frame time).
+*   **Changed**: `opentype.js` and `polygon-clipping` are now bundled via npm/Vite instead of loaded from jsdelivr/esm.sh CDNs at runtime — no more runtime dependency on external CDNs.
+*   **Added**: `vitest` test runner and geometry regression tests (`js/geometry.test.js`) covering the arc-sampling bug class that shipped twice (malformed br-arc endpoint, swapped swf=0 angles) — verified the suite catches the historical bug by reintroducing it.
+
 ### [v4.0] – 2026-03-05
 **"Vertical Evolution & Dynamic Scaling"**
 *   **Total Layout Refactor**: Moved character inventory from the bottom to a high-density, scrollable Right Overview column.
