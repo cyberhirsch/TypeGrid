@@ -1,8 +1,8 @@
 /**
  * Font and SVG export logic.
  * Uses boolean union to merge all glyph shapes into clean contours before export.
- * Depends on opentype.js being available as a global (loaded via CDN script tag).
  */
+import opentype from 'opentype.js';
 import { collectShapes, unionShapes } from './geometry.js';
 
 /** Boolean-union a glyph's shapes into clean outline rings. */

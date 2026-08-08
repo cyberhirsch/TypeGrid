@@ -72,7 +72,7 @@ design decision before coding starts.
   confirmed root cause. Fix that first, then reproduce with a drawn
   diagonal+horizontal join before changing the union logic. Pairs
   naturally with the geometry regression tests below.
-- [ ] **Fix drag performance on large grids** — every `pointermove` during a
+- [x] **Fix drag performance on large grids** — every `pointermove` during a
   fill/line drag calls `refresh()`, which rebuilds *all* glyph/variant
   thumbnails (measured: 15,212 DOM elements, ~1.1s per drag step at 15×15,
   vs 135ms at the 6×4 default — the PRD's own "no lag up to 15×15" bar).
