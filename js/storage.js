@@ -79,6 +79,10 @@ export function loadFromFile(onLoad) {
         reader.onload = ev => {
             try {
                 const data = JSON.parse(ev.target.result);
+                if (!data.config) throw new Error('Invalid file: missing config object');
+                if (!data.config.fontName && !data.config.baseline) {
+                    throw new Error('Wrong file type: this appears to be an IconGrid (.igf) file, not a Typegrid (.tgf) file');
+                }
                 const glyphs = {};
                 Object.entries(data.glyphs || {}).forEach(([k, v]) => {
                     glyphs[k] = { fills: new Set(v.fills || []), strokes: new Set(v.strokes || []) };
@@ -86,7 +90,7 @@ export function loadFromFile(onLoad) {
                 onLoad({ config: data.config, glyphs });
             } catch (err) {
                 console.warn('Failed to parse project file:', err);
-                alert('Invalid project file.');
+                alert(`Invalid project file: ${err.message}`);
             }
         };
         reader.readAsText(file);
@@ -156,6 +160,10 @@ export function loadIconFromFile(onLoad) {
         reader.onload = ev => {
             try {
                 const data = JSON.parse(ev.target.result);
+                if (!data.config) throw new Error('Invalid file: missing config object');
+                if (!data.config.brandName && data.config.fontName) {
+                    throw new Error('Wrong file type: this appears to be a Typegrid (.tgf) file, not an IconGrid (.igf) file');
+                }
                 const glyphs = {};
                 Object.entries(data.glyphs || {}).forEach(([k, v]) => {
                     glyphs[k] = { fills: new Set(v.fills || []), strokes: new Set(v.strokes || []) };
@@ -163,7 +171,7 @@ export function loadIconFromFile(onLoad) {
                 onLoad({ config: data.config, glyphs });
             } catch (err) {
                 console.warn('Failed to parse icon project file:', err);
-                alert('Invalid project file.');
+                alert(`Invalid project file: ${err.message}`);
             }
         };
         reader.readAsText(file);
