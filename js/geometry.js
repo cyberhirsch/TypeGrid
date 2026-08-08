@@ -4,7 +4,7 @@
  */
 import polygonClipping from 'polygon-clipping';
 
-const ARC_STEPS = 12; // segments per semicircle cap
+const ARC_STEPS = 32; // segments per semicircle cap
 
 export const quantize = v => Math.round(v * 10) / 10;
 
