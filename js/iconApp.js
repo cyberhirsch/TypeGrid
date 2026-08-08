@@ -576,14 +576,16 @@ class IconGrid {
             item.appendChild(svg);
             item.appendChild(lbl);
 
-            item.onclick = () => { this.state.activeChar = name; this.refresh(); };
-            item.ondblclick = () => {
-                const renamed = prompt('Rename variant:', name);
-                if (!renamed || !renamed.trim() || renamed === name) return;
-                const trimmed = renamed.trim();
-                this.state.glyphs[trimmed] = this.state.glyphs[name];
-                delete this.state.glyphs[name];
-                if (this.state.activeChar === name) this.state.activeChar = trimmed;
+            item.onclick = (e) => {
+                if (e.detail === 2) {
+                    const renamed = prompt('Rename variant:', name);
+                    if (!renamed || !renamed.trim() || renamed === name) return;
+                    const trimmed = renamed.trim();
+                    this.state.glyphs[trimmed] = this.state.glyphs[name];
+                    delete this.state.glyphs[name];
+                    if (this.state.activeChar === name) this.state.activeChar = trimmed;
+                }
+                this.state.activeChar = name;
                 this.refresh();
             };
             item.oncontextmenu = e => {
