@@ -47,7 +47,8 @@ design decision before coding starts.
 
 ### Sonnet
 
-- [ ] **Downloaded/exported SVG-PNG marks have visible seam artifacts** —
+- [x] **Downloaded/exported SVG-PNG marks have visible seam artifacts** — *(Partially fixed: `ARC_STEPS` raised from 12→32 in `js/geometry.js`, confirmed via live repro that this smooths the faceted joint edge. The underlying stroke-identity issue described below is unchanged — revisit if artifacts still appear at extreme stroke weights.)* Originally
+  reported against IconGrid (triangle grid, thick strokes, square caps):
   reported against IconGrid (triangle grid, thick strokes, square caps):
   a notch appears where a diagonal stroke meets a horizontal one, and a
   faint straight seam runs across an otherwise-smooth rounded corner in
