@@ -34,9 +34,59 @@ class IconGrid {
             activeChar: 'Primary',
             glyphs: {}
         };
+        this.history = [];
+        this.redoStack = [];
+        this.pushHistory();
         this.init();
     }
 
+    pushHistory() {
+        const snapshot = JSON.stringify({
+            config: this.config,
+            glyphs: Object.keys(this.state.glyphs).reduce((acc, key) => {
+                acc[key] = {
+                    fills: Array.from(this.state.glyphs[key].fills),
+                    strokes: Array.from(this.state.glyphs[key].strokes)
+                };
+                return acc;
+            }, {})
+        });
+        this.history.push(snapshot);
+        if (this.history.length > 50) this.history.shift();
+        this.redoStack = [];
+    }
+
+    undo() {
+        if (this.history.length <= 1) return;
+        this.redoStack.push(this.history.pop());
+        this.applySnapshot(this.history[this.history.length - 1]);
+    }
+
+    redo() {
+        if (this.redoStack.length === 0) return;
+        const snapshot = this.redoStack.pop();
+        this.history.push(snapshot);
+        this.applySnapshot(snapshot);
+    }
+
+    applySnapshot(snapshot) {
+        const data = JSON.parse(snapshot);
+        this.config = { ...this.config, ...data.config };
+        this.state.glyphs = {};
+        Object.keys(data.glyphs).forEach(key => {
+            this.state.glyphs[key] = {
+                fills: new Set(data.glyphs[key].fills),
+                strokes: new Set(data.glyphs[key].strokes)
+            };
+        });
+        if (Object.keys(this.state.glyphs).length > 0 && !this.state.glyphs[this.state.activeChar]) {
+            this.state.activeChar = Object.keys(this.state.glyphs)[0];
+        }
+        this.syncUI();
+        this.refresh();
+    }
+
+    /* ── DOM ─────────────────────────────────────────────────────────────── */
     async init() {
         this.cacheDOM();
         this.bindEvents();
