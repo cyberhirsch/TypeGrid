@@ -155,11 +155,20 @@ design decision before coding starts.
   grid-type-agnostic and used as-is by Typegrid, so this is copying the
   button + `config.showTopo` flag + the two-line render branch into
   `iconApp.js`, not writing new geometry logic.
-- [ ] **Wire the undo/redo buttons in `main.js`** — `#undoBtn`/`#redoBtn` exist
-  in `index.html` and `iconApp.js` has a history/redo stack, but `main.js`
-  (Typegrid) has no matching wiring at all. Port the same history/undo/redo
-  pattern once iconApp's version is fixed and finalized, plus `Ctrl+Z` / `Ctrl+Y`
-  keyboard bindings in both apps.
+- [ ] **Wire the undo/redo buttons (currently dead in both apps) and fix their placement** —
+  confirmed via grep: `#undoBtn`/`#redoBtn` ([index.html:35-36](index.html:35)) have
+  no `.onclick` handler anywhere in `main.js` or `js/iconApp.js`, and there's no
+  `Ctrl+Z`/`Ctrl+Y` keyboard listener either — clicking them is currently a no-op
+  in both Typegrid and IconGrid. `iconApp.js` has an internal history/redoStack and
+  `undo()`/`redo()` methods already, but nothing calls them; `main.js` has no undo
+  system at all. Also: `.undo-redo-controls` ([style.css:161](style.css:161)) is
+  markup-wise sandwiched between the app-switcher and the tagline
+  (`<div class="header"><div class="app-switcher">...</div><div class="undo-redo-controls">...</div><p class="tagline">...</p></div>`),
+  which renders as a stray centered row floating between the logo and the tagline
+  instead of living near New/Load/Save where a user would expect history controls.
+  Fix both: wire click handlers + keyboard shortcuts in both apps (porting/finishing
+  iconApp's history pattern to main.js), and move the undo/redo buttons into the
+  New/Load/Save button row (or otherwise group them with persistence controls).
 
 ### Sonnet
 
