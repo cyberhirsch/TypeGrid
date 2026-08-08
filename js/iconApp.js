@@ -621,7 +621,7 @@ class IconGrid {
                 svg.setAttribute('width', size);
                 svg.setAttribute('height', size);
                 svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                drawInto(this, svg, this.state.activeChar, W, H, false);
+                drawInto(this, svg, this.state.activeChar, W, H, false, false);
 
                 swatch.appendChild(svg);
                 this.usagePreview.appendChild(swatch);

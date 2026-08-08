@@ -4,7 +4,7 @@
 import { mk, mkLine, mkHit, mkArcHit, mkPoly, mkPath } from './primitives.js';
 import { strokeRing, mkStrokeId } from './geometry.js';
 
-export function drawInto(app, svg, ch, W, H, interactive) {
+export function drawInto(app, svg, ch, W, H, interactive, showGuides) {
     const { config } = app;
     const cw = W / config.cols, rh = H / config.rows;
 
@@ -27,7 +27,8 @@ export function drawInto(app, svg, ch, W, H, interactive) {
     drawFills(app, drawTarget, ch, cw, rh, interactive);
     drawStrokes(app, drawTarget, ch, cw, rh);
 
-    if (config.showGridLines || !interactive)
+    if (showGuides === undefined) showGuides = config.showGridLines || !interactive;
+    if (showGuides)
         drawGuides(app, drawTarget, cw, rh, W, H, interactive ? '#333' : '#1a1a1a');
 
     if (interactive) {
