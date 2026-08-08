@@ -3,6 +3,7 @@
  */
 
 const STORAGE_KEY = 'typegrid_v4';
+let storageWarningShown = false;
 
 export function generateCharSets() {
     const range = (start, end) =>
@@ -27,7 +28,14 @@ export function saveToStorage(config, glyphs) {
     Object.entries(glyphs).forEach(([k, v]) => {
         data.glyphs[k] = { fills: [...v.fills], strokes: [...v.strokes] };
     });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+        if (!storageWarningShown) {
+            console.warn('Failed to save to localStorage (quota exceeded or private browsing?). Autosave disabled:', e);
+            storageWarningShown = true;
+        }
+    }
 }
 
 export function loadFromStorage() {
@@ -97,7 +105,14 @@ export function saveIconToStorage(config, glyphs) {
     Object.entries(glyphs).forEach(([k, v]) => {
         data.glyphs[k] = { fills: [...v.fills], strokes: [...v.strokes] };
     });
-    localStorage.setItem(ICON_STORAGE_KEY, JSON.stringify(data));
+    try {
+        localStorage.setItem(ICON_STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+        if (!storageWarningShown) {
+            console.warn('Failed to save to localStorage (quota exceeded or private browsing?). Autosave disabled:', e);
+            storageWarningShown = true;
+        }
+    }
 }
 
 export function loadIconFromStorage() {
