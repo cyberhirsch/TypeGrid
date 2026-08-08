@@ -31,6 +31,10 @@
                     <button class="app-switch-btn active" data-app="type" onclick="switchApp('type')">TYPE<span>GRID</span></button>
                     <button class="app-switch-btn" data-app="icon" onclick="switchApp('icon')">ICON<span>GRID</span></button>
                 </div>
+                <div class="undo-redo-controls">
+                    <button id="undoBtn" title="Undo (Ctrl+Z)">⟲</button>
+                    <button id="redoBtn" title="Redo (Ctrl+Y)">⟳</button>
+                </div>
                 <p class="tagline">Geometric Font Synth</p>
             </div>
 
@@ -461,7 +465,7 @@
                     <input type="text" id="iconMetaBrand" placeholder="Brand name">
                 </div>
                 <div class="control-group">
-                    <label>Primary Color</label>
+                    <label>Export Color</label>
                     <input type="text" id="iconMetaColor" placeholder="#000000">
                 </div>
                 <div class="control-group">
